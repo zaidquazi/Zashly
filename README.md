@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <h1 align="center">✨ Fullstack Chat & Video Calling App ✨</h1>
 
 ![Demo App](/frontend/public/screenshot-for-readme.png)
@@ -53,3 +54,7 @@ cd frontend
 npm install
 npm run dev
 ```
+=======
+# Zashly
+this is a simple chat application.
+>>>>>>> bb5f149f02747b77807b87ac91351ff378828ff4
