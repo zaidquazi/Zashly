@@ -3,21 +3,20 @@ import "dotenv/config";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import authRoutes from "./routes/auth.route.js";
 import userRoutes from "./routes/user.route.js";
 import chatRoutes from "./routes/chat.route.js";
 import momentRoutes from "./routes/moment.route.js";
-import adminRoutes from "./routes/admin.route.js";
-import adminContentRoutes from "./routes/admin.content.route.js";
-import adminSystemRoutes from "./routes/admin.system.route.js";
 
 import { connectDB } from "./lib/db.js";
 
 const app = express();
-const PORT = process.env.PORT || 5001;
-
-const __dirname = path.resolve();
+const PORT = process.env.PORT || 5002;
 
 app.use(
   cors({
@@ -35,9 +34,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/moments", momentRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/admin/content", adminContentRoutes);
-app.use("/api/admin/system", adminSystemRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
