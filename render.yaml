@@ -1,4 +1,8 @@
+# Render.com Configuration for Zashly
+# This file contains the configuration for deploying both backend and frontend to Render.com
+
 services:
+  # Backend Service (Node.js/Express)
   - type: web
     name: zashly-backend
     env: node
@@ -10,13 +14,34 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 18
-      - key: FRONTEND_ORIGIN
-        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000  # Render will automatically assign a port, but we need this for the application
       - key: MONGODB_URI
-        sync: false
+        sync: false  # Will be set in Render dashboard
       - key: JWT_SECRET
-        sync: false
+        sync: false  # Will be set in Render dashboard
       - key: STREAM_API_KEY
-        sync: false
+        sync: false  # Will be set in Render dashboard
       - key: STREAM_API_SECRET
-        sync: false
+        sync: false  # Will be set in Render dashboard
+      - key: FRONTEND_ORIGIN
+        value: https://zashly.onrender.com  # Update this with your frontend URL after deployment
+
+  # Frontend Service (Static Site)
+  - type: static_site
+    name: zashly-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    publicPath: /dist  # Vite's default output directory
+    staticOptions:
+      headers:
+        - name: Cache-Control
+          value: 'public, max-age=31536000, immutable'
+    envVars:
+      - key: VITE_API_URL
+        value: https://zashly-backend.onrender.com  # Update with your backend service URL
+      - key: VITE_STREAM_CHAT_API_KEY
+        sync: false  # Same as STREAM_API_KEY in backend, set in Render dashboard

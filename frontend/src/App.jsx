@@ -9,6 +9,8 @@ import CallPage from "./pages/CallPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
 import FriendsPage from "./pages/FriendsPage.jsx";
+import AdminLogin from "./pages/admin/AdminLogin.jsx";
+import AdminLayout from "./components/AdminLayout.jsx";
 
 import { Toaster } from "react-hot-toast";
 
@@ -27,6 +29,7 @@ const App = () => {
 
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
+  const isAdmin = authUser?.role === "admin";
 
   useEffect(() => {
     if (isAuthenticated && isOnboarded) {
@@ -130,6 +133,29 @@ const App = () => {
               )
             ) : (
               <Navigate to="/login" />
+            )
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin/login"
+          element={
+            isAuthenticated && isAdmin ? (
+              <Navigate to="/admin" />
+            ) : (
+              <AdminLogin />
+            )
+          }
+        />
+        
+        <Route
+          path="/admin/*"
+          element={
+            isAuthenticated && isAdmin ? (
+              <AdminLayout />
+            ) : (
+              <Navigate to={isAuthenticated ? "/" : "/login"} />
             )
           }
         />
