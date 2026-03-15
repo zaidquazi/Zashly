@@ -55,8 +55,8 @@ const OnboardingPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error("Please select an image smaller than 3MB");
+    if (file.size > 7 * 1024 * 1024) {
+      toast.error("Please select an image smaller than 7MB");
       return;
     }
 

@@ -91,6 +91,7 @@ const NotificationsPage = () => {
                               <img
                                  src={request.sender.profilePic}
                                  alt={request.sender.fullName}
+                                 className="rounded-full"
                               />
                             </div>
                             <div>
@@ -135,6 +136,7 @@ const NotificationsPage = () => {
                             <img
                               src={notification.recipient.profilePic}
                               alt={notification.recipient.fullName}
+                              className="rounded-full"
                             />
                           </div>
                           <div className="flex-1">

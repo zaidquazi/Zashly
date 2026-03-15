@@ -72,6 +72,11 @@ export const searchUsers = async (query) => {
   return response.data;
 };
 
+export const updateProfile = async (profileData) => {
+  const response = await axiosInstance.put("/users/profile", profileData);
+  return response.data;
+};
+
 // Moments (Stories)
 export async function getMoments() {
   const res = await axiosInstance.get("/moments");

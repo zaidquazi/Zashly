@@ -231,7 +231,7 @@ const Navbar = () => {
               <div className="avatar">
                 <div className="w-9 rounded-full">
                   <img
-                    src={authUser?.profilePic || "/default-avatar.png"}
+                    src={authUser?.profilePic || `https://picsum.photos/seed/default-avatar/200/200.jpg`}
                     alt="User Avatar"
                     referrerPolicy="no-referrer"
                   />

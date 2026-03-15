@@ -8,13 +8,17 @@ import {
   UsersIcon,
   MenuIcon,
   XIcon,
+  SettingsIcon,
+  ChevronUpIcon,
+  UserIcon,
 } from "lucide-react";
 
 const Sidebar = () => {
   const { authUser } = useAuthUser();
   const location = useLocation();
   const currentPath = location.pathname;
-  const [isOpen, setIsOpen] = useState(false); // state for mobile sidebar
+  const [isOpen, setIsOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
@@ -84,9 +88,12 @@ const Sidebar = () => {
           </Link>
         </nav>
 
-        {/* User Profile Section */}
+        {/* User Profile Section with Dropdown */}
         <div className="p-4 border-t border-base-300 mt-auto">
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:bg-base-300 rounded-lg p-2 transition-colors"
+            onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+          >
             <div className="avatar">
               <div className="w-10 rounded-full">
                 <img
@@ -95,14 +102,38 @@ const Sidebar = () => {
                 />
               </div>
             </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">{authUser?.fullName}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm truncate">{authUser?.fullName}</p>
               <p className="text-xs text-success flex items-center gap-1">
                 <span className="size-2 rounded-full bg-success inline-block" />
                 Online
               </p>
             </div>
+            <ChevronUpIcon
+              className={`size-4 transition-transform ${
+                isProfileDropdownOpen ? "" : "rotate-180"
+              }`}
+            />
           </div>
+
+          {/* Dropdown Menu */}
+          {isProfileDropdownOpen && (
+            <div className="mt-2 space-y-1">
+              <Link
+                to="/edit-profile"
+                className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case btn-sm ${
+                  currentPath === "/edit-profile" ? "btn-active" : ""
+                }`}
+                onClick={() => {
+                  setIsProfileDropdownOpen(false);
+                  setIsOpen(false);
+                }}
+              >
+                <UserIcon className="size-4 text-base-content opacity-70" />
+                <span>Edit Profile</span>
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
 

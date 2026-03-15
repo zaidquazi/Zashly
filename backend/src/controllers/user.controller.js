@@ -1,5 +1,45 @@
 import User from "../models/User.js";
 import FriendRequest from "../models/FriendRequest.js";
+import { upsertStreamUser } from "../lib/stream.js";
+
+export async function updateProfile(req, res) {
+  try {
+    const userId = req.user.id;
+    const { fullName, bio, location, profilePic } = req.body;
+
+    const updateData = {};
+    if (fullName !== undefined) updateData.fullName = fullName;
+    if (bio !== undefined) updateData.bio = bio;
+    if (location !== undefined) updateData.location = location;
+    if (profilePic !== undefined) updateData.profilePic = profilePic;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update Stream user
+    try {
+      await upsertStreamUser({
+        id: updatedUser._id.toString(),
+        name: updatedUser.fullName,
+        image: updatedUser.profilePic || "",
+      });
+    } catch (streamError) {
+      console.log("Error updating Stream user:", streamError.message);
+    }
+
+    res.status(200).json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error("Error in updateProfile controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
 
 export async function getRecommendedUsers(req, res) {
   try {
@@ -26,7 +66,13 @@ export async function getMyFriends(req, res) {
       .select("friends")
       .populate("friends", "fullName profilePic nativeLanguage learningLanguage");
 
-    res.status(200).json(user.friends);
+    // Add online status to each friend
+    const friendsWithStatus = user.friends.map(friend => ({
+      ...friend.toObject(),
+      isOnline: false // Default to offline, will be updated by Socket.IO
+    }));
+
+    res.status(200).json(friendsWithStatus);
   } catch (error) {
     console.error("Error in getMyFriends controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
