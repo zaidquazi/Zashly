@@ -45,12 +45,14 @@ const ChatPage = () => {
       try {
         const client = StreamChat.getInstance(STREAM_API_KEY);
         const desiredId = String(authUser._id);
+        // Only pass image if it's a URL, not a base64 string (base64 breaks WebSocket URL length limits)
+        const userImage = authUser.profilePic && !authUser.profilePic.startsWith('data:') ? authUser.profilePic : '';
         if (!client.userID) {
           await client.connectUser(
             {
               id: desiredId,
               name: authUser.fullName,
-              image: authUser.profilePic,
+              image: userImage,
             },
             tokenData.token
           );
@@ -60,7 +62,7 @@ const ChatPage = () => {
             {
               id: desiredId,
               name: authUser.fullName,
-              image: authUser.profilePic,
+              image: userImage,
             },
             tokenData.token
           );

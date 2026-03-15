@@ -37,15 +37,17 @@ const CallPage = () => {
 
   useEffect(() => {
     const initCall = async () => {
-      if (!tokenData.token || !authUser || !callId) return;
+      if (!tokenData?.token || !authUser || !callId) return;
 
       try {
         console.log("Initializing Stream video client...");
 
+        // Only pass image if it's a URL, not a base64 string (base64 exceeds Stream's 5KB user data limit)
+        const userImage = authUser.profilePic && !authUser.profilePic.startsWith('data:') ? authUser.profilePic : '';
         const user = {
           id: authUser._id,
           name: authUser.fullName,
-          image: authUser.profilePic,
+          image: userImage,
         };
 
         const videoClient = new StreamVideoClient({

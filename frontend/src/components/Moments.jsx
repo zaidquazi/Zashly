@@ -14,7 +14,12 @@ import MomentViewer from "./MomentViewer";
 export default function Moments() {
   const queryClient = useQueryClient();
   const { data: moments = [] } = useQuery({ queryKey: ["moments"], queryFn: getMoments });
-  const { data: authUser } = useQuery({ queryKey: ["authUser"], queryFn: getAuthUser });
+  const { data: authUser } = useQuery({ 
+  queryKey: ["authUser"], 
+  queryFn: getAuthUser,
+  retry: 1,
+  staleTime: 1000 * 60 * 5, // 5 minutes
+});
   const [viewerOpen, setViewerOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [preview, setPreview] = useState(null);
@@ -26,7 +31,10 @@ export default function Moments() {
   // --- Delete moment mutation
   const delMutation = useMutation({
     mutationFn: (id) => deleteMoment(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["moments"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moments"] });
+      setConfirmDelete(null); // Close confirmation dialog after successful deletion
+    },
   });
 
   // --- Auto-delete old moments (>24h)
@@ -122,7 +130,7 @@ export default function Moments() {
       </div>
 
       <div className="relative">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 px-2 sm:px-0">
           <UploadTile onUpload={onUpload} preview={preview} setPreview={setPreview} />
 
           {visibleMoments.map((m, idx) => {
@@ -132,18 +140,19 @@ export default function Moments() {
             const momentUserId =
               m.userId || m.user?._id || m.user?.id || "";
             const authUserId =
+              authUser?.user?._id || authUser?.user?.id || authUser?.user?.userId || 
               authUser?._id || authUser?.id || authUser?.userId || "";
             const isOwner = momentUserId && authUserId && String(momentUserId) === String(authUserId);
-            const role = authUser?.role;
+            const role = authUser?.user?.role || authUser?.role;
             const canDelete = isOwner || role === "developer" || role === "admin";
 
             return (
-              <button
-                key={m.id}
-                className="group relative shrink-0"
-                onClick={() => openAt(idx)}
-                title={`${m.username}'s moment`}
-              >
+              <div key={m.id} className="group relative shrink-0">
+                <div
+                  className="cursor-pointer"
+                  onClick={() => openAt(idx)}
+                  title={`${m.username}'s moment`}
+                >
                 <motion.div
                   whileHover={{ y: -2 }}
                   className={`p-0.5 rounded-full ${
@@ -151,15 +160,29 @@ export default function Moments() {
                   }`}
                 >
                   <div className="p-1 bg-base-100 rounded-full">
-                    <div className="avatar">
-                      <div className="w-14 h-14 rounded-full overflow-hidden">
-                        <img
-                          src={m.avatar || m.url}
-                          alt={m.username || "moment"}
-                          className="object-cover w-full h-full"
+                    {m.type === "video" ? (
+                      <div className="relative">
+                        <video
+                          src={m.url}
+                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover"
+                          muted
+                          playsInline
+                          onMouseEnter={(e) => e.target.play()}
+                          onMouseLeave={(e) => e.target.pause()}
                         />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/50 rounded-full p-1">
+                            <Camera className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <img
+                        src={m.url}
+                        alt={`${m.username}'s moment`}
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover"
+                      />
+                    )}
                   </div>
                 </motion.div>
 
@@ -167,7 +190,7 @@ export default function Moments() {
                 {canDelete && (
                   <div className="absolute -top-1 -right-1 z-20">
                     <button
-                      className="btn btn-ghost btn-xs"
+                      className="btn btn-circle btn-xs bg-red-500 hover:bg-red-600 text-white border-0 shadow-lg"
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpenId((prev) => (prev === m.id ? null : m.id));
@@ -175,29 +198,30 @@ export default function Moments() {
                       aria-label="Open menu"
                       title="Options"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="w-3 h-3 sm:w-4 sm:h-4" />
                     </button>
                     {menuOpenId === m.id && (
                       <div
-                        className="mt-1 dropdown-content menu p-1 shadow bg-base-100 rounded-box w-28 border absolute right-0"
+                        className="mt-1 dropdown-content menu p-1 shadow bg-base-100 rounded-box w-24 sm:w-28 border absolute right-0 z-30"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
-                          className="w-full flex items-center gap-2 px-2 py-1 hover:bg-base-200 rounded text-left"
+                          className="w-full flex items-center gap-2 px-2 py-1 hover:bg-base-200 rounded text-left text-xs sm:text-sm"
                           onClick={() => {
                             setMenuOpenId(null);
                             confirmDeleteMoment(m.id);
                           }}
                         >
-                          <Trash className="w-4 h-4 text-error" />
-                          <span className="text-sm">Delete</span>
+                          <Trash className="w-3 h-3 sm:w-4 sm:h-4 text-error" />
+                          <span className="text-xs sm:text-sm">Delete</span>
                         </button>
                       </div>
                     )}
                   </div>
                 )}
-                <div className="text-center text-xs mt-1 opacity-70">{m.username}</div>
-              </button>
+                <div className="text-center text-xs mt-1 opacity-70 hidden sm:block">{m.username}</div>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -219,8 +243,8 @@ export default function Moments() {
 
       {/* 🧠 Confirmation Popup */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-base-200 rounded-xl shadow-lg p-6 w-80 text-center">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-base-200 rounded-xl shadow-lg p-4 sm:p-6 w-72 sm:w-80 max-w-full text-center">
             <h3 className="text-lg font-semibold mb-2">Delete Moment?</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               Are you sure you want to delete this moment? This action cannot be undone.

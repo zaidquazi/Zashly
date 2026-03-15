@@ -11,7 +11,8 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
   const queryClient = useQueryClient();
   const { data: authUser } = useQuery({ queryKey: ["authUser"], queryFn: getAuthUser });
   const [reply, setReply] = useState("");
-  const isOwner = !!(authUser && current?.userId && String(current.userId) === String(authUser._id || authUser.id));
+  const authUserId = authUser?.user?._id || authUser?.user?.id || authUser?._id || authUser?.id || "";
+  const isOwner = !!(authUserId && current?.userId && String(current.userId) === String(authUserId));
 
   useEffect(() => {
     if (!open || !current) return;
@@ -78,9 +79,9 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
             </div>
 
             {/* Delete own moment */}
-            {isOwner && (
+            {/* {isOwner && (
               <OwnerDeleteButton momentId={current.id} onDeleted={onClose} />
-            )}
+            )} */}
 
             {current?.type === "video" ? (
               <video
@@ -109,12 +110,13 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
   );
 }
 
-function OwnerDeleteButton({ momentId }) {
+function OwnerDeleteButton({ momentId, onDeleted }) {
   const queryClient = useQueryClient();
   const delMutation = useMutation({
     mutationFn: () => deleteMoment(momentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["moments"] });
+      onDeleted?.(); // Close viewer after successful deletion
     },
   });
   return (
@@ -122,8 +124,9 @@ function OwnerDeleteButton({ momentId }) {
       className="absolute top-2 left-2 btn btn-xs btn-error text-white"
       onClick={() => delMutation.mutate()}
       title="Delete Moment"
+      disabled={delMutation.isLoading}
     >
-      <Trash2 className="w-4 h-4" />
+      {delMutation.isLoading ? "..." : <Trash2 className="w-4 h-4" />}
     </button>
   );
 }

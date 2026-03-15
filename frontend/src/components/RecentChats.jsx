@@ -35,11 +35,13 @@ export default function RecentChats() {
 
         client = StreamChat.getInstance(STREAM_API_KEY);
         if (!client.userID) {
+          // Only pass image if it's a URL, not a base64 string (base64 breaks WebSocket URL length limits)
+          const userImage = auth?.profilePic && !auth.profilePic.startsWith('data:') ? auth.profilePic : '';
           await client.connectUser(
             {
               id: userId,
               name: auth?.fullName || auth?.username || "User",
-              image: auth?.profilePic || "",
+              image: userImage,
             },
             tokenData.token
           );
