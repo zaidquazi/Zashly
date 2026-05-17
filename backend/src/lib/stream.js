@@ -4,21 +4,15 @@ import "dotenv/config";
 const apiKey = process.env.STREAM_API_KEY || process.env.STEAM_API_KEY;
 const apiSecret = process.env.STREAM_API_SECRET || process.env.STEAM_API_SECRET;
 
-console.log("🔧 Stream Config:", { 
-  apiKey: apiKey ? `${apiKey.slice(0, 6)}...` : 'MISSING', 
-  apiSecret: apiSecret ? `${apiSecret.slice(0, 6)}...` : 'MISSING' 
-});
-
-let streamClient = null;
+export let streamClient = null;
 if (apiKey && apiSecret) {
   try {
     streamClient = StreamChat.getInstance(apiKey, apiSecret);
-    console.log("✅ Stream Chat client initialized successfully");
   } catch (e) {
-    console.error("❌ Stream Chat init failed:", e.message);
+    console.error("Stream Chat init failed:", e.message);
   }
 } else {
-  console.warn("⚠️  Stream API key or secret missing – chat features disabled");
+  console.warn("Stream API key or secret missing – chat features disabled");
 }
 
 export const upsertStreamUser = async (userData) => {
@@ -34,16 +28,14 @@ export const upsertStreamUser = async (userData) => {
 
 export const generateStreamToken = (userId) => {
   if (!streamClient) {
-    console.error("❌ Cannot generate token: Stream client not initialized");
+    console.error("Cannot generate token: Stream client not initialized");
     return null;
   }
   try {
     const userIdStr = userId.toString();
-    const token = streamClient.createToken(userIdStr);
-    console.log(`✅ Generated Stream token for user: ${userIdStr}`);
-    return token;
+    return streamClient.createToken(userIdStr);
   } catch (error) {
-    console.error("❌ Error generating Stream token:", error);
+    console.error("Error generating Stream token:", error);
   }
   return null;
 };

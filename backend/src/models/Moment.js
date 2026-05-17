@@ -14,6 +14,8 @@ const momentSchema = new mongoose.Schema(
 
 // TTL index to auto-remove after expiresAt
 momentSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Index for sorting moments by creation date
+momentSchema.index({ createdAt: -1 });
 
 const Moment = mongoose.model("Moment", momentSchema);
 export default Moment;

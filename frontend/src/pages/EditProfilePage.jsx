@@ -16,6 +16,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import imageCompression from "browser-image-compression";
+import ProfileAvatar from "../components/ProfileAvatar";
 
 const EditProfilePage = () => {
   const navigate = useNavigate();
@@ -140,9 +141,7 @@ const EditProfilePage = () => {
                       </button>
                     </>
                   ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <CameraIcon className="size-12 text-base-content opacity-40" />
-                    </div>
+                    <ProfileAvatar src="" name={formState.fullName} size="w-full h-full" textSize="text-4xl" />
                   )}
                 </div>
 

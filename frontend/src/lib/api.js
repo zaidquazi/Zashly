@@ -19,7 +19,13 @@ export const getAuthUser = async () => {
     const res = await axiosInstance.get("/auth/me");
     return res.data;
   } catch (error) {
-    console.log("Error in getAuthUser:", error);
+    const status = error?.response?.status;
+    if (status !== 401 && import.meta.env.DEV) {
+      console.warn(
+        "getAuthUser failed:",
+        error?.response?.data?.message || error?.message || error
+      );
+    }
     return null;
   }
 };
@@ -59,6 +65,11 @@ export async function acceptFriendRequest(requestId) {
   return response.data;
 }
 
+export async function rejectFriendRequest(requestId) {
+  const response = await axiosInstance.put(`/users/friend-request/${requestId}/reject`);
+  return response.data;
+}
+
 export async function getStreamToken() {
   const response = await axiosInstance.get("/chat/token");
   return response.data;
@@ -77,7 +88,6 @@ export const updateProfile = async (profileData) => {
   return response.data;
 };
 
-// Moments (Stories)
 export async function getMoments() {
   const res = await axiosInstance.get("/moments");
   return res.data;
@@ -105,5 +115,50 @@ export async function getMomentReplies(id) {
 
 export async function createMomentReply(id, payload) {
   const res = await axiosInstance.post(`/moments/${id}/replies`, payload);
+  return res.data;
+}
+
+export async function createPoll(data) {
+  const res = await axiosInstance.post("/chat/polls", data);
+  return res.data;
+}
+
+export async function votePoll(pollId, optionIndex) {
+  const res = await axiosInstance.post(`/chat/polls/${pollId}/vote`, { optionIndex });
+  return res.data;
+}
+
+export async function getPoll(pollId) {
+  const res = await axiosInstance.get(`/chat/polls/${pollId}`);
+  return res.data;
+}
+
+export async function blockUser(userId) {
+  const res = await axiosInstance.post(`/users/block/${userId}`);
+  return res.data;
+}
+
+export async function unblockUser(userId) {
+  const res = await axiosInstance.post(`/users/unblock/${userId}`);
+  return res.data;
+}
+
+export async function updateSettings(settingsData) {
+  const res = await axiosInstance.put("/users/settings", settingsData);
+  return res.data;
+}
+
+export async function getBlockedUsers() {
+  const res = await axiosInstance.get("/users/blocked");
+  return res.data;
+}
+
+export async function getNotifications() {
+  const res = await axiosInstance.get("/notifications");
+  return res.data;
+}
+
+export async function markAllNotificationsRead() {
+  const res = await axiosInstance.put("/notifications/mark-all-read");
   return res.data;
 }

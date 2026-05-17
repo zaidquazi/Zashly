@@ -25,7 +25,7 @@ export async function signup(req, res) {
       return res.status(400).json({ message: "Email already exists, please use a diffrent one" });
     }
 
-    const idx = Math.floor(Math.random() * 100) + 1; // generate a num between 1-100
+    const idx = Math.floor(Math.random() * 100) + 1;
     const randomAvatar = `https://picsum.photos/seed/user${idx}/200/200.jpg`;
 
     const newUser = await User.create({
@@ -41,10 +41,7 @@ export async function signup(req, res) {
         name: newUser.fullName,
         image: newUser.profilePic || "",
       });
-      console.log(`Stream user created for ${newUser.fullName}`);
-    } catch (error) {
-      console.log("Error creating Stream user:", error);
-    }
+    } catch (error) {}
 
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
@@ -52,14 +49,14 @@ export async function signup(req, res) {
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true, // prevent XSS attacks,
-      sameSite: "strict", // prevent CSRF attacks
+      httpOnly: true,
+      sameSite: "strict",
       secure: process.env.NODE_ENV === "production",
     });
 
     res.status(201).json({ success: true, user: newUser });
   } catch (error) {
-    console.log("Error in signup controller", error);
+    console.error("Error in signup controller", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -84,14 +81,14 @@ export async function login(req, res) {
 
     res.cookie("jwt", token, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: true, // prevent XSS attacks,
-      sameSite: "strict", // prevent CSRF attacks
+      httpOnly: true,
+      sameSite: "strict",
       secure: process.env.NODE_ENV === "production",
     });
 
     res.status(200).json({ success: true, user });
   } catch (error) {
-    console.log("Error in login controller", error.message);
+    console.error("Error in login controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -135,10 +132,7 @@ export async function onboard(req, res) {
         name: updatedUser.fullName,
         image: updatedUser.profilePic || "",
       });
-      console.log(`Stream user updated after onboarding for ${updatedUser.fullName}`);
-    } catch (streamError) {
-      console.log("Error updating Stream user during onboarding:", streamError.message);
-    }
+    } catch (streamError) {}
 
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {

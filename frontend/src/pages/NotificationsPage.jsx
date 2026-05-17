@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { acceptFriendRequest, getFriendRequests } from "../lib/api";
+import { acceptFriendRequest, rejectFriendRequest, getFriendRequests, getNotifications, markAllNotificationsRead } from "../lib/api";
+import { formatDistanceToNow } from "date-fns";
+
 import {
   BellIcon,
   ClockIcon,
@@ -10,8 +12,14 @@ import {
 } from "lucide-react";
 import {
   UsersIcon,
+  HeartIcon,
+  MessageCircleIcon,
+  Trash2Icon,
+  CheckCheckIcon
 } from "lucide-react";
+
 import NoNotificationsFound from "../components/NoNotificationsFound";
+import ProfileAvatar from "../components/ProfileAvatar";
 
 const NotificationsPage = () => {
   const queryClient = useQueryClient();
@@ -22,6 +30,19 @@ const NotificationsPage = () => {
     refetchInterval: 10000, 
   });
 
+  const { data: notifications, isLoading: isNotificationsLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: getNotifications,
+    refetchInterval: 15000,
+  });
+
+  const { mutate: markAllReadMutation } = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
   const { mutate: acceptRequestMutation, isPending } = useMutation({
     mutationFn: acceptFriendRequest,
     onSuccess: () => {
@@ -29,6 +50,8 @@ const NotificationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["friends"] });
     },
   });
+
+
 
   const previousCountRef = useRef(0);
   const audioRef = useRef(null);
@@ -57,15 +80,28 @@ const NotificationsPage = () => {
       <br/>
       
       <div className="container mx-auto max-w-4xl space-y-8">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6">
-          Notifications
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Notifications
+          </h1>
+          {notifications?.length > 0 && (
+            <button 
+              onClick={() => markAllReadMutation()}
+              className="btn btn-ghost btn-sm gap-2"
+            >
+              <CheckCheckIcon size={16} />
+              Mark all as read
+            </button>
+          )}
+        </div>
 
-        {isLoading ? (
+
+        {isLoading || isNotificationsLoading ? (
           <div className="flex justify-center py-12">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         ) : (
+
           <>
             {/* Friend Requests */}
             {incomingRequests.length > 0 && (
@@ -87,17 +123,12 @@ const NotificationsPage = () => {
                       <div className="card-body p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="avatar w-14 h-14 rounded-full bg-base-300">
-                              <img
-                                 src={request.sender?.profilePic}
-                                 alt={request.sender?.fullName}
-                                 className="rounded-full"
-                              />
-                            </div>
+                            <ProfileAvatar src={request.sender?.profilePic} name={request.sender?.fullName} size="w-14 h-14" textSize="text-xl" />
                             <div>
                               <h3 className="font-semibold">
                                 {request.sender?.fullName}
                               </h3>
+                              <p className="text-xs opacity-60">Sent you a friend request</p>
                             </div>
                           </div>
 
@@ -116,6 +147,53 @@ const NotificationsPage = () => {
               </section>
             )}
 
+            {/* In-App Notifications (Likes/Comments) */}
+            {notifications?.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <BellIcon className="h-5 w-5 text-primary" />
+                  Recent Activity
+                </h2>
+
+                <div className="space-y-3">
+                  {notifications.map((n) => (
+                    <div
+                      key={n._id}
+                      className={`card bg-base-200 shadow-sm border-l-4 ${!n.isRead ? 'border-primary' : 'border-transparent'}`}
+                    >
+                      <div className="card-body p-4">
+                        <div className="flex items-start gap-3">
+                          <ProfileAvatar src={n.sender?.profilePic} name={n.sender?.fullName} size="w-12 h-12" />
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm">
+                              {n.sender?.fullName}
+                            </h3>
+                            <p className="text-sm my-1">
+                              {n.type === 'like' ? (
+                                <span>liked your <Link to="/sparks" className="text-primary hover:underline font-medium">spark</Link></span>
+                              ) : n.type === 'comment' ? (
+                                <span>commented: "{n.content}"</span>
+                              ) : (
+                                "interacted with you"
+                              )}
+                            </p>
+                            <p className="text-[10px] opacity-50 flex items-center gap-1">
+                              <ClockIcon size={10} />
+                              {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <div className={`size-8 rounded-lg flex items-center justify-center ${n.type === 'like' ? 'bg-error/10 text-error' : 'bg-info/10 text-info'}`}>
+                            {n.type === 'like' ? <HeartIcon size={16} fill="currentColor" /> : <MessageCircleIcon size={16} />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+
             {/* Accepted Friend Requests */}
             {acceptedRequests.length > 0 && (
               <section className="space-y-4">
@@ -132,13 +210,7 @@ const NotificationsPage = () => {
                     >
                       <div className="card-body p-4">
                         <div className="flex items-start gap-3">
-                          <div className="avatar mt-1 size-10 rounded-full">
-                            <img
-                              src={notification.recipient?.profilePic}
-                              alt={notification.recipient?.fullName}
-                              className="rounded-full"
-                            />
-                          </div>
+                          <ProfileAvatar src={notification.recipient?.profilePic} name={notification.recipient?.fullName} size="w-10 h-10" textSize="text-base" />
                           <div className="flex-1">
                             <h3 className="font-semibold">
                               {notification.recipient?.fullName}
@@ -164,9 +236,10 @@ const NotificationsPage = () => {
               </section>
             )}
 
-            {incomingRequests.length === 0 && acceptedRequests.length === 0 && (
+            {incomingRequests.length === 0 && acceptedRequests.length === 0 && (!notifications || notifications.length === 0) && (
               <NoNotificationsFound />
             )}
+
           </>
         )}
       </div>

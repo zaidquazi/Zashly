@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getAuthUser, getStreamToken, getUserFriends } from "../lib/api";
 import { StreamChat } from "stream-chat";
+import ProfileAvatar from "../components/ProfileAvatar";
+import NotificationBadge from "../components/NotificationBadge";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
@@ -18,6 +20,23 @@ export default function RecentChats() {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [unreadCounts, setUnreadCounts] = useState({}); // { channelId: count }
+
+  // ── Compute unread counts from channels ────────────────────
+  const refreshUnreadCounts = useCallback((channelList) => {
+    const counts = {};
+    channelList.forEach((ch) => {
+      try {
+        const count = ch.countUnread?.() ?? 0;
+        if (count > 0) {
+          counts[ch.id] = count;
+        }
+      } catch {
+        // countUnread may not be available
+      }
+    });
+    setUnreadCounts(counts);
+  }, []);
 
   useEffect(() => {
     let client;
@@ -59,6 +78,7 @@ export default function RecentChats() {
             );
             if (!mounted) return;
             setChannels(qs);
+            refreshUnreadCounts(qs);
           } catch (err) {
             console.error("RecentChats fetchChannels error", err);
           }
@@ -85,7 +105,17 @@ export default function RecentChats() {
               const bTs = b.state?.last_message_at || b.state?.updated_at || b.state?.messages?.slice(-1)[0]?.created_at;
               return new Date(bTs) - new Date(aTs);
             });
+            // Refresh unread counts with the updated list
+            refreshUnreadCounts(updated);
             return updated;
+          });
+        };
+
+        // Listen for mark-read events to update badges in real-time
+        const onMarkRead = () => {
+          setChannels((prev) => {
+            refreshUnreadCounts(prev);
+            return prev;
           });
         };
 
@@ -98,11 +128,15 @@ export default function RecentChats() {
         };
 
         client.on("message.new", onMessageNew);
+        client.on("message.read", onMarkRead);
+        client.on("notification.mark_read", onMarkRead);
         client.on("notification.added_to_channel", onAddedToChannel);
         client.on("channel.updated", onChannelUpdated);
 
         const cleanup = () => {
           client.off("message.new", onMessageNew);
+          client.off("message.read", onMarkRead);
+          client.off("notification.mark_read", onMarkRead);
           client.off("notification.added_to_channel", onAddedToChannel);
           client.off("channel.updated", onChannelUpdated);
         };
@@ -121,13 +155,16 @@ export default function RecentChats() {
       if (init.cleanup) init.cleanup();
       // Do not disconnect here to avoid race with ChatPage
     };
-  }, [auth, tokenData]);
+  }, [auth, tokenData, refreshUnreadCounts]);
 
   const items = useMemo(() => {
     if (channels?.length) {
       return channels
         .map((ch) => {
           const members = Object.values(ch.state.members || {});
+          // Only show direct messages (max 2 members, no custom group name)
+          if (members.length > 2 || ch.data?.name) return null;
+
           const meId = currentUserId || auth?._id || auth?.id || auth?.userId;
           const otherMember = members.find((m) => (m.user?.id || m.user_id) !== meId);
           if (!otherMember) return null;
@@ -135,12 +172,15 @@ export default function RecentChats() {
           const lastMsg = (ch.state.messages || []).slice(-1)[0];
           const preview = lastMsg?.text || (lastMsg?.attachments?.length ? "Attachment" : "");
           const ts = ch.state.last_message_at || ch.state.updated_at || lastMsg?.created_at;
+          const unread = unreadCounts[ch.id] || 0;
           return {
+            channelId: ch.id,
             id: other.id,
             name: other.name || other.fullName || "User",
             avatar: other.image || other.profilePic || "",
             lastText: preview,
             lastTime: ts ? new Date(ts) : null,
+            unread,
           };
         })
         .filter(Boolean);
@@ -151,8 +191,9 @@ export default function RecentChats() {
       avatar: f.profilePic || "",
       lastText: "",
       lastTime: null,
+      unread: 0,
     }));
-  }, [channels, auth, friends, currentUserId]);
+  }, [channels, auth, friends, currentUserId, unreadCounts]);
 
   if (loading) return null;
   if (!items?.length) return null;
@@ -178,27 +219,24 @@ export default function RecentChats() {
       <h3 className="text-lg font-semibold"> Chats</h3>
       <div className="block">
         <ul className="flex flex-col divide-y divide-base-200">
-          {items.map((u) => (
-            <li key={u.id}>
+          {items.map((u, i) => (
+            <li key={u.channelId || u.id || i}>
               <div
                 className="relative flex items-center gap-3 py-3 px-1 hover:bg-base-200/40 transition-colors cursor-pointer"
                 onClick={() => navigate(`/chat/${u.id}`)}
               >
-                <div className="avatar">
-                  <div className="w-12 h-12 rounded-full overflow-hidden">
-                    {u.avatar ? (
-                      <img src={u.avatar} alt={u.name} />
-                    ) : (
-                      <div className="bg-base-300 w-full h-full" />
-                    )}
-                  </div>
-                </div>
+                <ProfileAvatar src={u.avatar} name={u.name} size="w-12 h-12" textSize="text-lg" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium truncate">{u.name}</div>
-                    <div className="text-xs opacity-60 whitespace-nowrap">{formatTime(u.lastTime)}</div>
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className={`font-medium truncate ${u.unread > 0 ? "font-bold" : ""}`}>{u.name}</div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <NotificationBadge count={u.unread} show={u.unread > 0} color="green" />
+                      <div className={`text-[10px] sm:text-xs whitespace-nowrap ${u.unread > 0 ? "text-primary font-semibold" : "opacity-60"}`}>
+                        {formatTime(u.lastTime)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm opacity-70 truncate">
+                  <div className={`text-sm truncate ${u.unread > 0 ? "opacity-90 font-medium" : "opacity-70"}`}>
                     {u.lastText || "Tap to message"}
                   </div>
                 </div>

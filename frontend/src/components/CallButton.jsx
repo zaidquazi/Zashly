@@ -1,10 +1,46 @@
-import { VideoIcon } from "lucide-react";
+import { Phone, Video } from "lucide-react";
 
-function CallButton({ handleVideoCall }) {
+/**
+ * Call buttons — Voice + Video
+ * Used in both ChatPage (1-on-1) and GroupChatPage
+ */
+function CallButton({ onVoiceCall, onVideoCall, compact = false }) {
+  if (compact) {
+    return (
+      <div className="call-buttons-compact">
+        <button
+          onClick={onVoiceCall}
+          className="call-btn-trigger voice"
+          title="Voice Call"
+        >
+          <Phone size={18} />
+        </button>
+        <button
+          onClick={onVideoCall}
+          className="call-btn-trigger video"
+          title="Video Call"
+        >
+          <Video size={18} />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-3 border-b flex items-center justify-end max-w-7xl mx-auto w-full absolute top-0">
-      <button onClick={handleVideoCall} className="btn btn-success btn-sm text-white">
-        <VideoIcon className="size-6" />
+    <div className="call-buttons-bar">
+      <button
+        onClick={onVoiceCall}
+        className="call-btn-trigger voice"
+        title="Voice Call"
+      >
+        <Phone size={18} />
+      </button>
+      <button
+        onClick={onVideoCall}
+        className="call-btn-trigger video"
+        title="Video Call"
+      >
+        <Video size={18} />
       </button>
     </div>
   );

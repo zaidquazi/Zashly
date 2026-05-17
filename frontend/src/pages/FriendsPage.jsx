@@ -1,80 +1,77 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-import { WifiIcon, WifiOffIcon } from "lucide-react";
+import { WifiIcon, WifiOffIcon, UsersIcon } from "lucide-react";
 
 import { getUserFriends } from "../lib/api";
 import FriendCard from "../components/FriendCard";
-import NoFriendsFound from "../components/NoFriendsFound";
 import useAuthUser from "../hooks/useAuthUser.js";
+import useSocket from "../hooks/useSocket.js";
 
 const FriendsPage = () => {
   const [filterStatus, setFilterStatus] = useState("online");
   const queryClient = useQueryClient();
   const { authUser } = useAuthUser();
-  const socket = io("http://localhost:5002", { 
-    withCredentials: true,
-    transports: ['websocket', 'polling'] // Ensure connection works
-  });
-
-  // Add connection status logging
-  socket.on('connect', () => {
-    console.log('Socket connected successfully:', socket.id);
-  });
-
-  socket.on('connect_error', (error) => {
-    console.error('Socket connection error:', error);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Socket disconnected');
-  });
+  const { socket, isConnected, emit } = useSocket();
 
   const { data: friends = [], isLoading: loadingFriends } = useQuery({
     queryKey: ["friends"],
     queryFn: getUserFriends,
-    onSuccess: (data) => {
-      console.log("Friends data loaded:", data);
-    }
   });
 
+  // ── Emit "user-online" and refetch friends when socket connects ───────────
+  // Refetch ensures we get the up-to-date isOnline values from the live
+  // onlineUsers Map (the API now cross-references it).
   useEffect(() => {
-    if (authUser) {
-      console.log("Setting up socket for user:", authUser._id);
-      const userId = authUser._id.toString(); // Ensure it's a string
-      
-      // Emit that current user is online
-      socket.emit("user-online", userId);
-      console.log("Emitted user-online for:", userId);
-      
-      // Listen for friend status changes
-      socket.on("friendStatusChange", (updatedFriend) => {
-        console.log("Received friend status change:", updatedFriend);
-        console.log("Current friends before update:", friends);
-        
-        queryClient.setQueryData(["friends"], (oldFriends = []) => {
-          console.log("Updating friends list:", oldFriends);
-          const updatedFriends = oldFriends.map((f) => {
-            const shouldUpdate = f._id === updatedFriend.userId || f._id?.toString() === updatedFriend.userId;
-            console.log(`Friend ${f._id} should update: ${shouldUpdate}`);
-            return shouldUpdate ? { ...f, isOnline: updatedFriend.isOnline } : f;
-          });
-          console.log("Friends after update:", updatedFriends);
-          return updatedFriends;
-        });
-      });
+    if (isConnected && authUser?._id) {
+      emit("user-online", authUser._id);
+      // Invalidate so the query re-runs and picks up accurate isOnline from API
+      queryClient.invalidateQueries({ queryKey: ["friends"] });
     }
+  }, [isConnected, authUser?._id, emit, queryClient]);
 
-    return () => {
-      socket.off("friendStatusChange");
+  // ── Handle full online-users roster sent by server on connect ─────────────
+  // Fixes the race condition: "User A was already online when I loaded the page."
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOnlineUsersList = (onlineUserIds) => {
+      // onlineUserIds is string[] of every currently-online userId
+      const onlineSet = new Set(onlineUserIds);
+      queryClient.setQueryData(["friends"], (oldFriends = []) =>
+        oldFriends.map((f) => ({
+          ...f,
+          isOnline: onlineSet.has(f._id?.toString()),
+        }))
+      );
     };
-  }, [authUser, queryClient]);
 
-  //  Count online/offline
+    socket.on("online-users-list", handleOnlineUsersList);
+    return () => socket.off("online-users-list", handleOnlineUsersList);
+  }, [socket, queryClient]);
+
+  // ── Real-time friend connect / disconnect ──────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleFriendStatusChange = ({ userId, isOnline }) => {
+      queryClient.setQueryData(["friends"], (oldFriends = []) =>
+        oldFriends.map((f) =>
+          f._id === userId || f._id?.toString() === userId
+            ? { ...f, isOnline }
+            : f
+        )
+      );
+    };
+
+    socket.on("friendStatusChange", handleFriendStatusChange);
+    return () => socket.off("friendStatusChange", handleFriendStatusChange);
+  }, [socket, queryClient]);
+
+  // ── Derived counts ─────────────────────────────────────────────────────────
   const onlineCount = friends.filter((f) => f.isOnline).length;
   const offlineCount = friends.filter((f) => !f.isOnline).length;
 
-  // Filter by status
+  // ── Filter friends by active tab ───────────────────────────────────────────
   const filteredFriends = friends.filter((friend) =>
     filterStatus === "online" ? friend.isOnline : !friend.isOnline
   );
@@ -82,34 +79,83 @@ const FriendsPage = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="container mx-auto space-y-8">
-        {/* Online / Offline Filter */}
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Friends</h1>
+          <span className="text-sm text-base-content/50">{friends.length} total</span>
+        </div>
+
+        {/* ── Online / Offline Toggle ──────────────────────────────────────── */}
         <div className="flex items-center gap-3">
           <button
-            className={`btn btn-sm flex items-center gap-2 ${
+            className={`btn btn-sm flex items-center gap-2 transition-all ${
               filterStatus === "online" ? "btn-primary" : "btn-outline"
             }`}
             onClick={() => setFilterStatus("online")}
           >
-            <WifiIcon size={16} /> Online ({onlineCount})
+            <WifiIcon size={14} />
+            Online
+            <span
+              className={`badge badge-xs ml-0.5 ${
+                filterStatus === "online" ? "badge-primary-content" : "badge-neutral"
+              }`}
+            >
+              {onlineCount}
+            </span>
           </button>
 
           <button
-            className={`btn btn-sm flex items-center gap-2 ${
+            className={`btn btn-sm flex items-center gap-2 transition-all ${
               filterStatus === "offline" ? "btn-primary" : "btn-outline"
             }`}
             onClick={() => setFilterStatus("offline")}
           >
-            <WifiOffIcon size={16} /> Offline ({offlineCount})
+            <WifiOffIcon size={14} />
+            Offline
+            <span
+              className={`badge badge-xs ml-0.5 ${
+                filterStatus === "offline" ? "badge-primary-content" : "badge-neutral"
+              }`}
+            >
+              {offlineCount}
+            </span>
           </button>
         </div>
 
-        {/* Friends List */}
+        {/* ── Friends List ─────────────────────────────────────────────────── */}
         {loadingFriends ? (
           <div className="flex justify-center py-12">
             <span className="loading loading-spinner loading-lg" />
           </div>
+        ) : friends.length === 0 ? (
+          <div className="card bg-base-200 p-8 text-center">
+            <UsersIcon className="mx-auto mb-3 text-base-content/30" size={48} />
+            <h3 className="font-semibold text-lg mb-1">No friends yet</h3>
+            <p className="text-base-content/60 text-sm">
+              Connect instantly, talk live, and meet friends — only on Zashly.
+            </p>
+          </div>
         ) : filteredFriends.length === 0 ? (
-          <NoFriendsFound />
+          <div className="card bg-base-200 p-8 text-center">
+            {filterStatus === "online" ? (
+              <>
+                <WifiIcon className="mx-auto mb-3 text-base-content/30" size={48} />
+                <h3 className="font-semibold text-lg mb-1">No friends online</h3>
+                <p className="text-base-content/60 text-sm">
+                  None of your friends are online right now. Check back later!
+                </p>
+              </>
+            ) : (
+              <>
+                <WifiOffIcon className="mx-auto mb-3 text-base-content/30" size={48} />
+                <h3 className="font-semibold text-lg mb-1">No offline friends</h3>
+                <p className="text-base-content/60 text-sm">
+                  All your friends are currently online — great timing!
+                </p>
+              </>
+            )}
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredFriends.map((friend) => (

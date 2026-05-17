@@ -33,12 +33,30 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
     friends: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    chatWallpaper: {
+      type: String,
+      default: "", // URL or preset color
+    },
+    privacySettings: {
+      lastSeen: { type: String, enum: ["everyone", "friends", "nobody"], default: "everyone" },
+      readReceipts: { type: Boolean, default: true },
+    },
     
     isOnline: {
       type: Boolean,
@@ -49,6 +67,40 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "developer", "admin"],
       default: "user",
     },
+    isBanned: {
+      type: Boolean,
+      default: false,
+    },
+    isVerified: { 
+      type: Boolean, 
+      default: false 
+    },
+    isShadowBanned: { 
+      type: Boolean, 
+      default: false 
+    },
+    strikes: { 
+      type: Number, 
+      default: 0 
+    },
+    activityScore: { 
+      type: Number, 
+      default: 100 
+    },
+    restrictions: {
+      canMessage: { type: Boolean, default: true },
+      canUploadMedia: { type: Boolean, default: true }
+    },
+    security: {
+      lastIp: String,
+      lastDevice: String,
+      geoCountry: String,
+      loginAttempts: { type: Number, default: 0 }
+    },
+    subscription: {
+      tier: { type: String, enum: ['free', 'premium'], default: 'free' },
+      expiresAt: Date
+    }
   },
   { timestamps: true }
 );

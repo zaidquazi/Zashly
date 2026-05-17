@@ -1,7 +1,0 @@
-backend
-node_modules
-.git
-.env
-.env.local
-.gitignore
-render.yaml

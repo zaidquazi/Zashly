@@ -18,7 +18,7 @@ export async function getMoments(req, res) {
       .populate("user", "fullName profilePic");
 
     res.json(
-      moments.map((m) => ({
+      moments.filter(m => m.user != null).map((m) => ({
         id: m._id,
         userId: m.user._id,
         username: m.user.fullName,
@@ -44,6 +44,10 @@ export async function createMoment(req, res) {
     }
     if (!["image", "video"].includes(type)) {
       return res.status(400).json({ message: "Invalid type" });
+    }
+
+    if (mediaUrl.length > 13000000) {
+      return res.status(413).json({ message: "File is too large to process. Maximum allowed is ~10MB." });
     }
 
     const moment = await Moment.create({
@@ -133,7 +137,7 @@ export async function getReplies(req, res) {
 
 export async function createReply(req, res) {
   try {
-    const { id } = req.params; // moment id
+    const { id } = req.params;
     const { text = "", emoji = "" } = req.body || {};
     if (!text && !emoji) return res.status(400).json({ message: "text or emoji required" });
     const reply = await MomentReply.create({ moment: id, sender: req.user.id, text, emoji });

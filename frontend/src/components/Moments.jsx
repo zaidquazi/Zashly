@@ -10,6 +10,9 @@ import {
   markMomentViewed,
 } from "../lib/api";
 import MomentViewer from "./MomentViewer";
+import StatusRing from "./StatusRing";
+import imageCompression from "browser-image-compression";
+import toast from "react-hot-toast";
 
 export default function Moments() {
   const queryClient = useQueryClient();
@@ -56,7 +59,12 @@ export default function Moments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["moments"] });
       setPreview(null);
+      toast.success("Moment posted successfully!");
     },
+    onError: (error) => {
+      console.error("Upload error:", error);
+      toast.error(error?.response?.data?.message || "Failed to post moment");
+    }
   });
 
   // --- Mark as viewed
@@ -94,14 +102,46 @@ export default function Moments() {
       v.src = url;
     });
 
+  // --- Image compression helper using browser-image-compression
+  const compressImage = async (file) => {
+    try {
+      const options = {
+        maxSizeMB: 0.5, // Target 500KB
+        maxWidthOrHeight: 1280,
+        useWebWorker: true,
+      };
+      const compressedFile = await imageCompression(file, options);
+      return await fileToDataUrl(compressedFile);
+    } catch (error) {
+      console.error("Compression error:", error);
+      return await fileToDataUrl(file); // Fallback to original if compression fails
+    }
+  };
+
   // --- Upload new moment
   const onUpload = async (file) => {
     if (!file) return;
+
+    // Check size before processing (limit to ~9MB to stay safe with Base64 overhead)
+    const MAX_SIZE = 9 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast.error("File is too large. Max limit is 9MB.");
+      return;
+    }
+
     const isVideo = file.type.startsWith("video/");
-    const dataUrl = await fileToDataUrl(file);
+    
+    let mediaData;
+    if (isVideo) {
+      mediaData = await fileToDataUrl(file);
+    } else {
+      // Compress image before upload to speed up transfer
+      mediaData = await compressImage(file);
+    }
+
     const durationMs = isVideo ? await getVideoDurationMs(file) : 5000;
     createMutation.mutate({
-      mediaUrl: dataUrl,
+      mediaUrl: mediaData,
       type: isVideo ? "video" : "image",
       durationMs,
     });
@@ -130,8 +170,13 @@ export default function Moments() {
       </div>
 
       <div className="relative">
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 px-2 sm:px-0">
-          <UploadTile onUpload={onUpload} preview={preview} setPreview={setPreview} />
+        <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto no-scrollbar pt-4 pb-2 px-2 sm:px-0">
+          <UploadTile 
+            onUpload={onUpload} 
+            preview={preview} 
+            setPreview={setPreview} 
+            isPosting={createMutation.isPending}
+          />
 
           {visibleMoments.map((m, idx) => {
             const isSeen = false;
@@ -147,44 +192,43 @@ export default function Moments() {
             const canDelete = isOwner || role === "developer" || role === "admin";
 
             return (
-              <div key={m.id} className="group relative shrink-0">
+              <div key={m.id} className="group relative shrink-0 flex flex-col items-center">
                 <div
-                  className="cursor-pointer"
+                  className="cursor-pointer flex flex-col items-center"
                   onClick={() => openAt(idx)}
                   title={`${m.username}'s moment`}
                 >
-                <motion.div
-                  whileHover={{ y: -2 }}
-                  className={`p-0.5 rounded-full ${
-                    isSeen ? "bg-base-300" : "bg-gradient-to-tr from-primary to-secondary"
-                  }`}
+                <StatusRing
+                  hasStatus={true}
+                  viewed={isSeen}
+                  isNew={!isSeen && idx === 0}
+                  size={80}
+                  onClick={() => openAt(idx)}
                 >
-                  <div className="p-1 bg-base-100 rounded-full">
-                    {m.type === "video" ? (
-                      <div className="relative">
-                        <video
-                          src={m.url}
-                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover"
-                          muted
-                          playsInline
-                          onMouseEnter={(e) => e.target.play()}
-                          onMouseLeave={(e) => e.target.pause()}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="bg-black/50 rounded-full p-1">
-                            <Camera className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                          </div>
+                  {m.type === "video" ? (
+                    <div className="relative w-full h-full">
+                      <video
+                        src={m.url}
+                        className="w-full h-full rounded-full object-cover"
+                        muted
+                        playsInline
+                        onMouseEnter={(e) => e.target.play()}
+                        onMouseLeave={(e) => e.target.pause()}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/50 rounded-full p-1">
+                          <Camera className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                         </div>
                       </div>
-                    ) : (
-                      <img
-                        src={m.url}
-                        alt={`${m.username}'s moment`}
-                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover"
-                      />
-                    )}
-                  </div>
-                </motion.div>
+                    </div>
+                  ) : (
+                    <img
+                      src={m.url}
+                      alt={`${m.username}'s moment`}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  )}
+                </StatusRing>
 
                 {/* ••• Menu at top-right */}
                 {canDelete && (
@@ -253,14 +297,18 @@ export default function Moments() {
               <button
                 className="btn btn-sm btn-error text-white"
                 onClick={handleDeleteConfirm}
-                disabled={delMutation.isLoading}
+                disabled={delMutation.isPending}
               >
-                {delMutation.isLoading ? "Deleting..." : "Delete"}
+                {delMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  "Delete"
+                )}
               </button>
               <button
                 className="btn btn-sm"
                 onClick={() => setConfirmDelete(null)}
-                disabled={delMutation.isLoading}
+                disabled={delMutation.isPending}
               >
                 Cancel
               </button>
@@ -273,7 +321,7 @@ export default function Moments() {
 }
 
 /* 🔼 UploadTile Component */
-function UploadTile({ onUpload, preview, setPreview }) {
+function UploadTile({ onUpload, preview, setPreview, isPosting }) {
   const onSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -281,21 +329,26 @@ function UploadTile({ onUpload, preview, setPreview }) {
   };
 
   return (
-    <div className="shrink-0">
-      <label className="group cursor-pointer">
+    <div className="shrink-0 flex flex-col items-center">
+      <label className={`group ${isPosting ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}>
         <div className="p-0.5 rounded-full bg-gradient-to-tr from-primary/80 to-secondary/80">
-          <div className="p-1 bg-base-100 rounded-full">
+          <div className="p-0.5 bg-base-100 rounded-full flex items-center justify-center">
             <div className="avatar">
-              <div className="w-15 h-20 rounded-full overflow-hidden relative flex items-center justify-center">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden relative flex items-center justify-center bg-base-200">
+                {isPosting ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-10">
+                    <span className="loading loading-spinner loading-md text-primary"></span>
+                  </div>
+                ) : null}
                 {preview ? (
                   preview.file.type.startsWith("video/") ? (
                     <video src={preview.url} className="object-cover w-full h-full" muted />
                   ) : (
-                    <img src={preview.url} alt="preview" />
+                    <img src={preview.url} className="object-cover w-full h-full" alt="preview" />
                   )
                 ) : (
                   <div className="flex flex-col items-center justify-center text-base-content/80">
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-5 h-5 mb-0.5" />
                     <Camera className="w-4 h-4" />
                   </div>
                 )}
@@ -303,6 +356,7 @@ function UploadTile({ onUpload, preview, setPreview }) {
                   hidden
                   type="file"
                   accept="image/*,video/*"
+                  disabled={isPosting}
                   onChange={onSelect}
                   onClick={(e) => (e.target.value = null)}
                 />
@@ -312,23 +366,26 @@ function UploadTile({ onUpload, preview, setPreview }) {
           </div>
         </div>
       </label>
-      <div className="flex gap-2 mt-1">
-        <button
-          className="btn btn-xs btn-primary"
-          onClick={() => preview && onUpload(preview.file)}
-          disabled={!preview}
-        >
-          Post
-        </button>
-        <button
-          className="btn btn-xs"
-          onClick={() => setPreview(null)}
-          disabled={!preview}
-        >
-          Clear
-        </button>
-      </div>
-      <div className="text-center text-xs opacity-70 mt-1">Add</div>
+      {preview ? (
+        <div className="flex gap-1 mt-1 justify-center">
+          <button
+            className="btn btn-xs btn-primary px-2 min-w-[50px]"
+            onClick={() => onUpload(preview.file)}
+            disabled={isPosting}
+          >
+            {isPosting ? <span className="loading loading-spinner loading-xs"></span> : "Post"}
+          </button>
+          <button
+            className="btn btn-xs px-2"
+            onClick={() => setPreview(null)}
+            disabled={isPosting}
+          >
+            Clear
+          </button>
+        </div>
+      ) : (
+        <div className="text-center text-xs opacity-70 mt-1">Add</div>
+      )}
     </div>
   );
 }

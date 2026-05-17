@@ -6,10 +6,15 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
 import CallPage from "./pages/CallPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
+import GroupChatPage from "./pages/GroupChatPage.jsx";
+import GroupsPage from "./pages/GroupsPage.jsx";
 import OnboardingPage from "./pages/OnboardingPage.jsx";
 import FriendsPage from "./pages/FriendsPage.jsx";
 import EditProfilePage from "./pages/EditProfilePage.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
+import CallsPage from "./pages/CallsPage.jsx";
 
 import { Toaster } from "react-hot-toast";
 
@@ -17,6 +22,9 @@ import PageLoader from "./components/PageLoader.jsx";
 import useAuthUser from "./hooks/useAuthUser.js";
 import Layout from "./components/Layout.jsx";
 import { useThemeStore } from "./store/useThemeStore.js";
+import useNotifications from "./hooks/useNotifications.js";
+import useGlobalAnnouncements from "./hooks/useGlobalAnnouncements.jsx";
+import CallProvider from "./components/CallProvider.jsx";
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
@@ -28,6 +36,12 @@ const App = () => {
 
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
+
+  // 🔔 Global WhatsApp-style notifications (sound + browser push)
+  useNotifications();
+
+  // 📢 Global Admin Announcements
+  useGlobalAnnouncements();
 
   useEffect(() => {
     if (isAuthenticated && isOnboarded) {
@@ -44,6 +58,9 @@ const App = () => {
 
   return (
     <div className="min-h-screen">
+      {/* 📞 Global Call Provider — handles incoming/outgoing calls app-wide */}
+      {isAuthenticated && isOnboarded && <CallProvider />}
+
       <Routes>
         <Route
           path="/"
@@ -65,6 +82,34 @@ const App = () => {
             isAuthenticated && isOnboarded ? (
               <Layout showSidebar={true}>
                 <FriendsPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+            )
+          }
+        />
+
+        {/* 💬 Groups */}
+        <Route
+          path="/groups"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <GroupsPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+            )
+          }
+        />
+
+        {/* 📞 Calls */}
+        <Route
+          path="/calls"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <CallsPage />
               </Layout>
             ) : (
               <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
@@ -120,6 +165,20 @@ const App = () => {
           }
         />
 
+        {/* Group Chat */}
+        <Route
+          path="/group/:groupId"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={false}>
+                <GroupChatPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+            )
+          }
+        />
+
         {/* Edit Profile */}
         <Route
           path="/edit-profile"
@@ -145,6 +204,38 @@ const App = () => {
               )
             ) : (
               <Navigate to="/login" />
+            )
+          }
+        />
+
+        {/* 🛡️ Admin Panel */}
+        <Route
+          path="/admin"
+          element={
+            isAuthenticated && isOnboarded ? (
+              authUser?.role === "admin" ? (
+                <Layout showSidebar={true}>
+                  <AdminPage />
+                </Layout>
+              ) : (
+                <Navigate to="/" />
+              )
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
+            )
+          }
+        />
+
+        {/* ⚙️ Settings Panel */}
+        <Route
+          path="/settings"
+          element={
+            isAuthenticated && isOnboarded ? (
+              <Layout showSidebar={true}>
+                <SettingsPage />
+              </Layout>
+            ) : (
+              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
             )
           }
         />

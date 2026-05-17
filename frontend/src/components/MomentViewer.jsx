@@ -7,6 +7,8 @@ import { createMomentReply, deleteMoment, getAuthUser, getMomentReplies } from "
 export default function MomentViewer({ open, moments, index, onClose, onPrev, onNext, onSeen }) {
   const timerRef = useRef(null);
   const progressRef = useRef(null);
+  const videoRef = useRef(null);
+  const lastTapRef = useRef(0);
   const current = moments[index];
   const queryClient = useQueryClient();
   const { data: authUser } = useQuery({ queryKey: ["authUser"], queryFn: getAuthUser });
@@ -85,11 +87,46 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
 
             {current?.type === "video" ? (
               <video
+                ref={videoRef}
                 src={current.url}
                 className="w-full h-full object-contain"
                 autoPlay
                 controls
                 playsInline
+                onDoubleClick={(e) => {
+                  const el = e.currentTarget;
+                  const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                  if (isFullscreen) {
+                    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+                  } else if (el.requestFullscreen) {
+                    el.requestFullscreen();
+                  } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                  } else if (el.webkitEnterFullscreen) {
+                    el.webkitEnterFullscreen();
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  const now = Date.now();
+                  if (now - lastTapRef.current < 300) {
+                    e.preventDefault();
+                    const el = videoRef.current;
+                    if (!el) return;
+                    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                    if (isFullscreen) {
+                      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+                    } else if (el.requestFullscreen) {
+                      el.requestFullscreen();
+                    } else if (el.webkitRequestFullscreen) {
+                      el.webkitRequestFullscreen();
+                    } else if (el.webkitEnterFullscreen) {
+                      el.webkitEnterFullscreen();
+                    }
+                    lastTapRef.current = 0;
+                  } else {
+                    lastTapRef.current = now;
+                  }
+                }}
               />
             ) : (
               <img src={current?.url} alt="moment" className="w-full h-full object-contain" />
