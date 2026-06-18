@@ -1,0 +1,25 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /features
+Allow: /about
+Allow: /login
+Allow: /signup
+Allow: /privacy
+Allow: /terms
+
+# Private authenticated app surfaces — do not index
+Disallow: /app
+Disallow: /friends
+Disallow: /groups
+Disallow: /calls
+Disallow: /chat/
+Disallow: /group/
+Disallow: /call/
+Disallow: /admin
+Disallow: /settings
+Disallow: /notifications
+Disallow: /onboarding
+Disallow: /edit-profile
+
+Sitemap: https://zashly.com/sitemap.xml

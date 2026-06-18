@@ -1,3 +1,4 @@
+import logger from "../monitoring/logger.js";
 import { generateStreamToken } from "../lib/stream.js";
 import Poll from "../models/Poll.js";
 import { getIO } from "../lib/socket.js";
@@ -10,7 +11,7 @@ export async function getStreamToken(req, res) {
     }
     res.status(200).json({ token });
   } catch (error) {
-    console.error("Error in getStreamToken controller:", error.message);
+    logger.error("Error in getStreamToken controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -39,7 +40,7 @@ export async function createPoll(req, res) {
 
     res.status(201).json(poll);
   } catch (error) {
-    console.error("Error in createPoll:", error.message);
+    logger.error("Error in createPoll:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -62,24 +63,24 @@ export async function votePoll(req, res) {
     const alreadyVotedThisOption = poll.options[optionIndex].votes.some(
       (v) => v.userId.toString() === userId.toString()
     );
+
     if (alreadyVotedThisOption) {
-      return res
-        .status(400)
-        .json({ message: "You already voted for this option." });
-    }
-
-    if (!poll.multipleChoice) {
-      const hasVotedAny = poll.options.some((opt) =>
-        opt.votes.some((v) => v.userId.toString() === userId.toString())
+      // Toggle off
+      poll.options[optionIndex].votes = poll.options[optionIndex].votes.filter(
+        (v) => v.userId.toString() !== userId.toString()
       );
-      if (hasVotedAny) {
-        return res
-          .status(400)
-          .json({ message: "You have already voted. This poll is single-choice." });
+    } else {
+      // Toggle on
+      if (!poll.multipleChoice) {
+        // Remove from all other options
+        poll.options.forEach((opt) => {
+          opt.votes = opt.votes.filter(
+            (v) => v.userId.toString() !== userId.toString()
+          );
+        });
       }
+      poll.options[optionIndex].votes.push({ userId, votedAt: new Date() });
     }
-
-    poll.options[optionIndex].votes.push({ userId, votedAt: new Date() });
     await poll.save();
 
     let populatedPoll = poll.toObject();
@@ -99,7 +100,7 @@ export async function votePoll(req, res) {
 
     res.status(200).json({ poll: populatedPoll });
   } catch (error) {
-    console.error("Error in votePoll:", error.message);
+    logger.error("Error in votePoll:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -121,7 +122,7 @@ export async function getPoll(req, res) {
 
     res.status(200).json(poll);
   } catch (error) {
-    console.error("Error in getPoll:", error.message);
+    logger.error("Error in getPoll:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

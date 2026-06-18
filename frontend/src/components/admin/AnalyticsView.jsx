@@ -7,8 +7,7 @@ import {
   ShieldCheckIcon,
   ArrowUpRightIcon,
   CalendarIcon,
-  FilterIcon,
-  VideoIcon
+  FilterIcon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { getAnalyticsData } from "../../lib/adminApi";
@@ -207,40 +206,7 @@ const AnalyticsView = ({ onTabChange }) => {
            </div>
         </div>
 
-        {/* Video Call Intensity Heatmap-style */}
-        <div className="lg:col-span-3 bg-base-200 border border-base-300 rounded-[2.5rem] p-8 shadow-sm group">
-           <div className="flex items-center gap-4 mb-8">
-              <div className="p-3 bg-cyan-500/10 text-cyan-500 rounded-2xl">
-                 <VideoIcon className="size-5" />
-              </div>
-              <div>
-                 <h3 className="font-bold">Video Session Density</h3>
-                 <p className="text-xs opacity-40">Frequency of video/audio call initiations for the selected range</p>
-              </div>
-           </div>
 
-           <div className="flex flex-wrap gap-2">
-              {data?.callStats?.map((day, idx) => {
-                const opacity = Math.min(0.2 + (day.count / 10), 1);
-                return (
-                  <div 
-                    key={idx} 
-                    className="size-8 rounded-lg border border-base-300 transition-all cursor-pointer relative group/cell flex items-center justify-center hover:scale-110"
-                    style={{ backgroundColor: `rgba(6, 182, 212, ${opacity})` }}
-                  >
-                     <span className={`text-[8px] font-bold ${opacity > 0.6 ? 'text-white' : 'text-cyan-500'}`}>{day._id}</span>
-                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/cell:opacity-100 transition-all bg-base-content text-base-100 text-[10px] font-bold px-3 py-1.5 rounded-xl shadow-2xl whitespace-nowrap z-20 scale-90 group-hover/cell:scale-100">
-                        {day.count} Sessions
-                     </div>
-                  </div>
-                );
-              })}
-              {/* Fill placeholders if data is sparse */}
-              {(!data?.callStats || data?.callStats.length < 14) && Array.from({ length: 14 - (data?.callStats?.length || 0) }).map((_, i) => (
-                <div key={`empty-call-${i}`} className="size-8 rounded-lg border border-base-300/50 bg-base-100 opacity-10" />
-              ))}
-           </div>
-        </div>
 
       </div>
 
@@ -279,7 +245,6 @@ const AnalyticsView = ({ onTabChange }) => {
                       <option value="all">Comprehensive (All Events)</option>
                       <option value="messages">Direct Messages Only</option>
                       <option value="moments">Platform Moments Only</option>
-                      <option value="calls">Video Connectivity Only</option>
                    </select>
                 </div>
              </div>

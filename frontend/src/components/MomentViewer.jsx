@@ -57,10 +57,6 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
-          <button className="absolute top-4 right-4 btn btn-circle btn-ghost text-white" onClick={(e) => { e.stopPropagation(); onClose(); }}>
-            <X />
-          </button>
-
           <button className="absolute left-4 btn btn-circle btn-ghost text-white" onClick={(e) => { e.stopPropagation(); onPrev(); }}>
             <ChevronLeft />
           </button>
@@ -69,16 +65,25 @@ export default function MomentViewer({ open, moments, index, onClose, onPrev, on
           </button>
 
           <motion.div
-            className="w-[86vw] max-w-[380px] sm:max-w-[440px] md:max-w-[500px] aspect-[9/16] md:aspect-auto md:h-[80vh] bg-black relative rounded-xl overflow-hidden shadow-2xl"
+            className="w-[86vw] max-w-[380px] sm:max-w-[440px] md:max-w-[500px] aspect-[9/16] md:aspect-auto md:h-[80vh] bg-black relative rounded-xl overflow-hidden shadow-2xl border border-base-content/10"
             initial={{ y: 20, scale: 0.98, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: 10, scale: 0.98, opacity: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-white/20">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-white/20 z-30">
               <div ref={progressRef} className="h-full bg-white" style={{ width: "0%" }} />
             </div>
+
+            {/* Close button inside container */}
+            <button
+              className="absolute top-4 right-4 z-30 btn btn-circle btn-sm btn-ghost text-white bg-black/40 hover:bg-black/60 border-0"
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              aria-label="Close viewer"
+            >
+              <X className="size-5" />
+            </button>
 
             {/* Delete own moment */}
             {/* {isOwner && (

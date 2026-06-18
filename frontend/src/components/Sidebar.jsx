@@ -5,9 +5,10 @@ import useAuthUser from "../hooks/useAuthUser";
 import {
   BellIcon,
   HomeIcon,
-  ShipWheelIcon,
+  LoaderPinwheel,
   UsersIcon,
   MessageSquareIcon,
+  PhoneIcon,
   MenuIcon,
   XIcon,
   SettingsIcon,
@@ -15,7 +16,6 @@ import {
   UserIcon,
   LogOutIcon,
   ShieldAlertIcon,
-  PhoneIcon,
 } from "lucide-react";
 import ThemeSelector from "./ThemeSelector";
 import useLogout from "../hooks/useLogout";
@@ -38,8 +38,8 @@ const Sidebar = () => {
       >
         {/* Logo */}
         <div className="p-5 border-b border-base-300 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 transition-all hover:scale-105 active:scale-95">
-            <ShipWheelIcon className="size-9 text-primary animate-spin-slow" />
+          <Link to="/app" className="flex items-center gap-2.5 transition-all hover:scale-105 active:scale-95">
+            <LoaderPinwheel className="size-9 text-primary animate-spin-slow" />
             <span className="text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-wider drop-shadow-sm">
               Zashly
             </span>
@@ -48,45 +48,50 @@ const Sidebar = () => {
 
         {/* Navigation Links */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <Link
-            to="/"
-            className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
-              currentPath === "/" ? "btn-active" : ""
-            }`}
-          >
-            <HomeIcon className="size-5 text-base-content opacity-70" />
-            <span>Home</span>
-          </Link>
+          {authUser?.role !== "admin" && (
+            <>
+              <Link
+                to="/app"
+                className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+                  currentPath === "/app" ? "btn-active" : ""
+                }`}
+              >
+                <HomeIcon className="size-5 text-base-content opacity-70" />
+                <span>Home</span>
+              </Link>
 
-          <Link
-            to="/friends"
-            className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
-              currentPath === "/friends" ? "btn-active" : ""
-            }`}
-          >
-            <UsersIcon className="size-5 text-base-content opacity-70" />
-            <span>Friends</span>
-          </Link>
+              <Link
+                to="/friends"
+                className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+                  currentPath === "/friends" ? "btn-active" : ""
+                }`}
+              >
+                <UsersIcon className="size-5 text-base-content opacity-70" />
+                <span>Friends</span>
+              </Link>
 
-          <Link
-            to="/groups"
-            className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
-              currentPath === "/groups" ? "btn-active" : ""
-            }`}
-          >
-            <MessageSquareIcon className="size-5 text-base-content opacity-70" />
-            <span>Groups</span>
-          </Link>
+              <Link
+                to="/groups"
+                className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+                  currentPath === "/groups" ? "btn-active" : ""
+                }`}
+              >
+                <MessageSquareIcon className="size-5 text-base-content opacity-70" />
+                <span>Groups</span>
+              </Link>
 
-          <Link
-            to="/calls"
-            className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
-              currentPath === "/calls" ? "btn-active" : ""
-            }`}
-          >
-            <PhoneIcon className="size-5 text-base-content opacity-70" />
-            <span>Calls</span>
-          </Link>
+              <Link
+                to="/calls"
+                className={`btn btn-ghost justify-start w-full gap-3 px-3 normal-case ${
+                  currentPath === "/calls" ? "btn-active" : ""
+                }`}
+              >
+                <PhoneIcon className="size-5 text-base-content opacity-70" />
+                <span>Calls</span>
+              </Link>
+
+            </>
+          )}
 
           {/* Admin Panel — only for admins */}
           {authUser?.role === "admin" && (

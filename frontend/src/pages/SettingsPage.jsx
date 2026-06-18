@@ -1,8 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { getBlockedUsers, unblockUser, updateSettings } from "../lib/api";
+import {
+  getBlockedUsers,
+  unblockUser,
+  updateSettings,
+  getActiveSessions,
+  logoutAllDevices,
+  getMyDeletionRequest,
+  cancelAccountDeletionRequest,
+} from "../lib/api";
+import DeleteAccountModal from "../components/settings/DeleteAccountModal";
 import useAuthUser from "../hooks/useAuthUser";
+import { buildSettingsState, getMediaDevicePrefs, saveMediaDevicePrefs } from "../utils/appSettings";
+import {
+  GeneralSettingsPanel,
+  ProfileSettingsPanel,
+  AccountSettingsPanel,
+  NotificationsSettingsPanel,
+  VideoSettingsPanel,
+  ShortcutsSettingsPanel,
+} from "../components/settings/SettingsTabContent";
 import { 
   ShieldIcon, 
   LockIcon, 
@@ -20,10 +39,13 @@ import {
   KeyboardIcon,
   MonitorIcon,
   KeyIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  LogOutIcon
 } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import ProfileAvatar from "../components/ProfileAvatar";
+import useLogout from "../hooks/useLogout";
+import LogoutConfirmModal from "../components/profile/LogoutConfirmModal";
 
 const wallpapers = [
   { name: "Default", value: "" },
@@ -33,22 +55,124 @@ const wallpapers = [
   { name: "Serene Nature", value: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&q=80" },
 ];
 
+const VALID_TABS = [
+  "general",
+  "profile",
+  "account",
+  "privacy",
+  "chats",
+  "video",
+  "notifications",
+  "shortcuts",
+];
+
 const SettingsPage = () => {
   const { authUser } = useAuthUser();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("privacy");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const initialTab = VALID_TABS.includes(tabFromUrl) ? tabFromUrl : "general";
+  const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Settings State
-  const [settings, setSettings] = useState({
-    chatWallpaper: authUser?.chatWallpaper || "",
-    privacySettings: {
-      lastSeen: authUser?.privacySettings?.lastSeen || "everyone",
-      readReceipts: authUser?.privacySettings?.readReceipts ?? true,
-    },
-    notifications: {
-      soundEnabled: true,
-      desktopEnabled: true,
+  const { logoutMutation } = useLogout();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    logoutMutation();
+    setShowLogoutConfirm(false);
+    toast.success("Logged out successfully!");
+  };
+
+  useEffect(() => {
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
     }
+  }, [tabFromUrl, activeTab]);
+
+  const selectTab = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId }, { replace: true });
+  };
+
+  const [settings, setSettings] = useState(() => buildSettingsState(authUser));
+  const [mediaPrefs, setMediaPrefs] = useState(getMediaDevicePrefs);
+  const [mediaDevices, setMediaDevices] = useState({ cameras: [], mics: [], speakers: [] });
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (authUser) {
+      setSettings(buildSettingsState(authUser));
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDevices = async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        setMediaDevices({
+          cameras: devices.filter((d) => d.kind === "videoinput"),
+          mics: devices.filter((d) => d.kind === "audioinput"),
+          speakers: devices.filter((d) => d.kind === "audiooutput"),
+        });
+      } catch {
+        /* permissions may be denied */
+      }
+    };
+    if (activeTab === "video") {
+      loadDevices();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const { data: sessionsData, isLoading: sessionsLoading } = useQuery({
+    queryKey: ["activeSessions"],
+    queryFn: getActiveSessions,
+    enabled: activeTab === "account",
+  });
+  const sessions = sessionsData?.sessions ?? [];
+
+  const { data: deletionData, isLoading: deletionLoading, refetch: refetchDeletion } =
+    useQuery({
+      queryKey: ["deletionRequest"],
+      queryFn: getMyDeletionRequest,
+      enabled: activeTab === "account" && !!authUser,
+    });
+  const deletionRequest = deletionData?.request ?? null;
+
+  const { mutate: cancelDeletionMutation, isPending: cancelDeletionPending } =
+    useMutation({
+      mutationFn: cancelAccountDeletionRequest,
+      onSuccess: (data) => {
+        toast.success(data.message || "Deletion request cancelled");
+        refetchDeletion();
+      },
+      onError: (error) => {
+        toast.error(
+          error.response?.data?.message || "Failed to cancel deletion request"
+        );
+      },
+    });
+
+  const { mutate: logoutAllMutation, isPending: logoutAllPending } = useMutation({
+    mutationFn: logoutAllDevices,
+    onSuccess: (data) => {
+      toast.success(data.message || "Logged out from all devices");
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      window.location.href = "/login";
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to log out all devices");
+    },
   });
 
   // Fetch Blocked Users
@@ -62,7 +186,7 @@ const SettingsPage = () => {
     mutationFn: unblockUser,
     onSuccess: (data) => {
       toast.success(data.message || "User unblocked successfully");
-      queryClient.invalidateQueries(["blockedUsers"]);
+      queryClient.invalidateQueries({ queryKey: ["blockedUsers"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to unblock user");
@@ -74,7 +198,7 @@ const SettingsPage = () => {
     mutationFn: updateSettings,
     onSuccess: () => {
       toast.success("Settings updated successfully");
-      queryClient.invalidateQueries(["authUser"]);
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to update settings");
@@ -83,6 +207,48 @@ const SettingsPage = () => {
 
   const handleSaveSettings = () => {
     updateSettingsMutation(settings);
+  };
+
+  const handleMediaPrefChange = (field, value) => {
+    setMediaPrefs((prev) => {
+      const next = { ...prev, [field]: value };
+      saveMediaDevicePrefs(next);
+      return next;
+    });
+  };
+
+  const handleTestNotification = () => {
+    const { soundEnabled, desktopEnabled } = settings.appSettings.notifications;
+    if (soundEnabled) {
+      const audio = new Audio("/notification.wav");
+      audio.volume = 0.6;
+      audio.play().catch(() => {});
+    }
+    if (desktopEnabled && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        new Notification("Zashly", {
+          body: "Test notification — your settings are working.",
+          icon: "/icon.png",
+          silent: !soundEnabled,
+        });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((perm) => {
+          if (perm === "granted") {
+            new Notification("Zashly", {
+              body: "Test notification — your settings are working.",
+              icon: "/icon.png",
+              silent: !soundEnabled,
+            });
+          } else {
+            toast("Allow browser notifications to see desktop alerts.");
+          }
+        });
+      } else {
+        toast.error("Desktop notifications are blocked in your browser.");
+      }
+    } else if (!desktopEnabled) {
+      toast.success("Sound test played (desktop notifications are off).");
+    }
   };
 
   const handlePrivacyChange = (field, value) => {
@@ -137,8 +303,10 @@ const SettingsPage = () => {
     { id: "shortcuts", label: "Keyboard shortcuts", icon: KeyboardIcon, desc: "Quick actions" },
   ];
 
+  const activeTabMeta = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-base-200/50 flex">
+    <div className="w-full min-w-0 min-h-full bg-base-200/50 flex flex-col md:flex-row">
       {/* 📁 Settings Sidebar */}
       <div className="w-full sm:w-80 bg-base-100 border-r border-base-300 flex flex-col shrink-0 hidden md:flex">
         <div className="p-6">
@@ -157,7 +325,7 @@ const SettingsPage = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectTab(tab.id)}
               className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 text-left group mb-1 ${
                 activeTab === tab.id ? "bg-primary/10 text-primary" : "hover:bg-base-200"
               }`}
@@ -175,40 +343,82 @@ const SettingsPage = () => {
             </button>
           ))}
         </div>
+
+        {/* Logout button at the bottom of the sidebar */}
+        <div className="p-4 border-t border-base-300 bg-base-100 shrink-0">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 text-left hover:bg-error/10 text-error group"
+          >
+            <div className="size-10 rounded-lg flex items-center justify-center bg-error/10 text-error group-hover:bg-error group-hover:text-error-content transition-colors shrink-0">
+              <LogOutIcon className="size-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">Log Out</p>
+              <p className="text-[10px] text-error/60 truncate">Sign out of Zashly</p>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* 📄 Settings Content Area */}
-      <div className="flex-1 overflow-y-auto bg-base-200/30">
-        <div className="max-w-3xl mx-auto p-4 sm:p-8 lg:p-12">
-          {/* Mobile Tab Selector (only visible on mobile) */}
-          <div className="md:hidden mb-6">
-             <h1 className="text-2xl font-bold mb-4">Settings</h1>
-             <select 
-               className="select select-bordered w-full"
-               value={activeTab}
-               onChange={(e) => setActiveTab(e.target.value)}
-             >
-               {tabs.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-             </select>
+      <div className="flex-1 min-w-0 w-full overflow-x-hidden bg-base-200/30">
+        <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-12 py-4 sm:py-8 pb-28 md:pb-12 box-border">
+          {/* Mobile section picker */}
+          <div className="md:hidden mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 sticky top-0 z-10 bg-base-200/95 backdrop-blur-md border-b border-base-300/60 pb-4 pt-1">
+            <h1 className="text-xl sm:text-2xl font-bold mb-3">Settings</h1>
+
+            <div
+              className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 -mx-1 px-1 snap-x snap-mandatory [scrollbar-width:thin]"
+              role="tablist"
+              aria-label="Settings sections"
+            >
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => selectTab(tab.id)}
+                    className={`snap-start shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                      isActive
+                        ? "bg-primary text-primary-content border-primary shadow-sm"
+                        : "bg-base-100 border-base-300 text-base-content/80 hover:border-primary/40"
+                    }`}
+                  >
+                    <Icon className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="whitespace-nowrap">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="mt-2 text-xs text-base-content/55 leading-snug">
+              {activeTabMeta.desc}
+            </p>
           </div>
 
           {activeTab === "privacy" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="flex items-center gap-3">
-                <LockIcon className="size-8 text-primary" />
-                <h2 className="text-2xl font-bold">Privacy</h2>
+            <div className="space-y-5 sm:space-y-8 w-full min-w-0 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-3 min-w-0">
+                <LockIcon className="size-7 sm:size-8 text-primary shrink-0" aria-hidden="true" />
+                <h2 className="text-xl sm:text-2xl font-bold truncate">Privacy</h2>
               </div>
 
-              <div className="card bg-base-100 shadow-sm border border-base-300">
-                <div className="card-body">
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-base-200/50 rounded-xl">
-                      <div>
-                        <h3 className="font-semibold flex items-center gap-2">Last Seen</h3>
-                        <p className="text-sm opacity-60">Who can see when you were last online</p>
+              <div className="card bg-base-100 shadow-sm border border-base-300 w-full min-w-0">
+                <div className="card-body p-4 sm:p-6">
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-base-200/50 rounded-xl">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold">Last Seen</h3>
+                        <p className="text-sm opacity-60 mt-0.5">Who can see when you were last online</p>
                       </div>
                       <select
-                        className="select select-bordered select-sm"
+                        className="select select-bordered w-full sm:w-auto sm:min-w-[11rem] shrink-0"
                         value={settings.privacySettings.lastSeen}
                         onChange={(e) => handlePrivacyChange("lastSeen", e.target.value)}
                       >
@@ -218,27 +428,33 @@ const SettingsPage = () => {
                       </select>
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-base-200/50 rounded-xl">
-                      <div>
-                        <h3 className="font-semibold flex items-center gap-2">Read Receipts</h3>
-                        <p className="text-sm opacity-60">Send and receive read receipts</p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-base-200/50 rounded-xl">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold">Read Receipts</h3>
+                        <p className="text-sm opacity-60 mt-0.5">Send and receive read receipts</p>
                       </div>
-                      <input
-                        type="checkbox"
-                        className="toggle toggle-primary"
-                        checked={settings.privacySettings.readReceipts}
-                        onChange={(e) => handlePrivacyChange("readReceipts", e.target.checked)}
-                      />
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <span className="text-sm opacity-60 sm:hidden">
+                          {settings.privacySettings.readReceipts ? "On" : "Off"}
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-primary"
+                          checked={settings.privacySettings.readReceipts}
+                          onChange={(e) => handlePrivacyChange("readReceipts", e.target.checked)}
+                          aria-label="Enable read receipts"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Blocked Users Section */}
-              <div className="card bg-base-100 shadow-sm border border-base-300">
-                <div className="card-body">
+              <div className="card bg-base-100 shadow-sm border border-base-300 w-full min-w-0">
+                <div className="card-body p-4 sm:p-6">
                   <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-error">
-                    <EyeOffIcon className="size-5" /> Blocked Users
+                    <EyeOffIcon className="size-5 shrink-0" aria-hidden="true" /> Blocked Users
                   </h3>
                   {isLoadingBlocked ? (
                     <div className="loading loading-spinner mx-auto" />
@@ -247,14 +463,14 @@ const SettingsPage = () => {
                   ) : (
                     <div className="space-y-2">
                       {blockedUsers.map(user => (
-                        <div key={user._id} className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl">
-                           <div className="flex items-center gap-3">
-                              <ProfileAvatar src={user.profilePic} name={user.fullName} size="w-10 h-10" />
-                              <span className="text-sm font-medium">{user.fullName}</span>
+                        <div key={user._id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-base-200/50 rounded-xl">
+                           <div className="flex items-center gap-3 min-w-0">
+                              <ProfileAvatar src={user.profilePic} name={user.fullName} size="w-10 h-10 shrink-0" />
+                              <span className="text-sm font-medium truncate">{user.fullName}</span>
                            </div>
                            <button 
                              onClick={() => unblockMutation(user._id)}
-                             className="btn btn-xs btn-outline btn-error"
+                             className="btn btn-sm btn-outline btn-error w-full sm:w-auto shrink-0"
                            >Unblock</button>
                         </div>
                       ))}
@@ -266,21 +482,21 @@ const SettingsPage = () => {
           )}
 
           {activeTab === "chats" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="flex items-center gap-3">
-                <MessageSquareIcon className="size-8 text-primary" />
-                <h2 className="text-2xl font-bold">Chats</h2>
+            <div className="space-y-5 sm:space-y-8 w-full min-w-0 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-3 min-w-0">
+                <MessageSquareIcon className="size-7 sm:size-8 text-primary shrink-0" aria-hidden="true" />
+                <h2 className="text-xl sm:text-2xl font-bold truncate">Chats</h2>
               </div>
 
-              <div className="card bg-base-100 shadow-sm border border-base-300">
-                <div className="card-body">
+              <div className="card bg-base-100 shadow-sm border border-base-300 w-full min-w-0">
+                <div className="card-body p-4 sm:p-6">
                   <h3 className="font-bold mb-4">Chat Wallpaper</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {wallpapers.map((wp, i) => (
                       <div
                         key={i}
                         className={`aspect-video rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${
-                          settings.chatWallpaper === wp.value ? "border-primary scale-105" : "border-transparent"
+                          settings.chatWallpaper === wp.value ? "border-primary sm:scale-105" : "border-transparent"
                         }`}
                         onClick={() => setSettings(s => ({ ...s, chatWallpaper: wp.value }))}
                       >
@@ -297,30 +513,97 @@ const SettingsPage = () => {
             </div>
           )}
 
-          {(activeTab === "notifications" || activeTab === "general" || activeTab === "account" || activeTab === "profile" || activeTab === "video" || activeTab === "shortcuts") && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="flex items-center gap-3">
-                <SettingsIcon className="size-8 text-primary" />
-                <h2 className="text-2xl font-bold capitalize">{activeTab}</h2>
-              </div>
-              <div className="card bg-base-100 shadow-sm border border-base-300 p-12 text-center opacity-50 italic">
-                 Content for {activeTab} settings is coming soon in the next update.
-              </div>
+          {activeTab === "general" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <GeneralSettingsPanel settings={settings} setSettings={setSettings} />
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <ProfileSettingsPanel authUser={authUser} />
+            </div>
+          )}
+
+          {activeTab === "account" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <AccountSettingsPanel
+                authUser={authUser}
+                sessions={sessions}
+                sessionsLoading={sessionsLoading}
+                onLogoutAll={() => logoutAllMutation()}
+                logoutAllPending={logoutAllPending}
+                deletionRequest={deletionRequest}
+                deletionLoading={deletionLoading}
+                onOpenDeleteModal={() => setDeleteModalOpen(true)}
+                onCancelDeletion={() => cancelDeletionMutation()}
+                cancelDeletionPending={cancelDeletionPending}
+              />
+            </div>
+          )}
+
+          {activeTab === "notifications" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <NotificationsSettingsPanel
+                settings={settings}
+                setSettings={setSettings}
+                onTestNotification={handleTestNotification}
+              />
+            </div>
+          )}
+
+          {activeTab === "video" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <VideoSettingsPanel
+                settings={settings}
+                setSettings={setSettings}
+                mediaDevices={mediaDevices}
+                mediaPrefs={mediaPrefs}
+                onMediaPrefChange={handleMediaPrefChange}
+              />
+            </div>
+          )}
+
+          {activeTab === "shortcuts" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <ShortcutsSettingsPanel />
             </div>
           )}
 
           {/* Global Save Button */}
-          <div className="mt-12 flex justify-end">
+          <div className="mt-8 md:mt-12 sticky bottom-0 md:static z-10 py-3 md:py-0 -mx-4 px-4 md:mx-0 md:px-0 bg-base-200/95 md:bg-transparent backdrop-blur-md md:backdrop-blur-none border-t border-base-300/60 md:border-t-0 flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleSaveSettings}
               disabled={isSavingSettings}
-              className="btn btn-primary px-8"
+              className="btn btn-primary flex-1 md:flex-initial md:px-8"
             >
               {isSavingSettings ? <span className="loading loading-spinner" /> : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="btn btn-outline btn-error flex-1 md:flex-initial md:px-8"
+            >
+              <LogOutIcon className="size-4 mr-2" /> Log Out
             </button>
           </div>
         </div>
       </div>
+
+
+      <DeleteAccountModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        authUser={authUser}
+        onSubmitted={() => refetchDeletion()}
+      />
+
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmLogout}
+        isPending={logoutMutation?.isPending}
+      />
     </div>
   );
 };

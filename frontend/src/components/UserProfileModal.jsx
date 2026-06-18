@@ -1,7 +1,7 @@
-import { XIcon, MessageSquareIcon, PhoneIcon, VideoIcon } from "lucide-react";
+import { XIcon, MessageSquareIcon } from "lucide-react";
 import ProfileAvatar from "./ProfileAvatar";
 
-const UserProfileModal = ({ user, onClose, onStartVoiceCall, onStartVideoCall }) => {
+const UserProfileModal = ({ user, onClose }) => {
   if (!user) return null;
 
   return (
@@ -31,14 +31,6 @@ const UserProfileModal = ({ user, onClose, onStartVoiceCall, onStartVideoCall })
               <MessageSquareIcon size={18} />
               Message
             </button>
-            <div className="flex gap-2">
-               <button className="btn btn-ghost btn-circle border border-base-300 hover:bg-base-300" onClick={onStartVoiceCall}>
-                 <PhoneIcon size={18} className="text-success" />
-               </button>
-               <button className="btn btn-ghost btn-circle border border-base-300 hover:bg-base-300" onClick={onStartVideoCall}>
-                 <VideoIcon size={18} className="text-info" />
-               </button>
-            </div>
           </div>
 
           <div className="w-full space-y-4">

@@ -101,7 +101,7 @@ const GroupInfoPanel = ({ isOpen, onClose, group, onGroupUpdated }) => {
     onSuccess: () => {
       toast.success("You left the group");
       queryClient.invalidateQueries({ queryKey: ["myGroups"] });
-      navigate("/");
+      navigate("/app");
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || "Failed to leave group");
@@ -191,7 +191,7 @@ const GroupInfoPanel = ({ isOpen, onClose, group, onGroupUpdated }) => {
     name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-[100] flex justify-end">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 

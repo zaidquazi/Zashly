@@ -21,5 +21,6 @@ const bannedWordSchema = new mongoose.Schema(
 
 
 bannedWordSchema.index({ isActive: 1 });
+bannedWordSchema.index({ createdAt: -1 }, { background: true });
 
 export default mongoose.model("BannedWord", bannedWordSchema);

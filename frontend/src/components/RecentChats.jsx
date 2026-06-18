@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getAuthUser, getStreamToken, getUserFriends } from "../lib/api";
+import { connectStreamUser } from "../lib/streamClient";
 import { StreamChat } from "stream-chat";
 import ProfileAvatar from "../components/ProfileAvatar";
 import NotificationBadge from "../components/NotificationBadge";
@@ -52,18 +53,10 @@ export default function RecentChats() {
         if (!userId) throw new Error('The "id" field on the user is missing');
         setCurrentUserId(userId);
 
-        client = StreamChat.getInstance(STREAM_API_KEY);
-        if (!client.userID) {
-          // Only pass image if it's a URL, not a base64 string (base64 breaks WebSocket URL length limits)
-          const userImage = auth?.profilePic && !auth.profilePic.startsWith('data:') ? auth.profilePic : '';
-          await client.connectUser(
-            {
-              id: userId,
-              name: auth?.fullName || auth?.username || "User",
-              image: userImage,
-            },
-            tokenData.token
-          );
+        client = await connectStreamUser(auth, tokenData.token);
+        if (!client) {
+          setLoading(false);
+          return;
         }
 
         const fetchChannels = async () => {
@@ -195,6 +188,8 @@ export default function RecentChats() {
     }));
   }, [channels, auth, friends, currentUserId, unreadCounts]);
 
+  const compact = auth?.appSettings?.general?.compactChatList ?? false;
+
   if (loading) return null;
   if (!items?.length) return null;
 
@@ -222,10 +217,17 @@ export default function RecentChats() {
           {items.map((u, i) => (
             <li key={u.channelId || u.id || i}>
               <div
-                className="relative flex items-center gap-3 py-3 px-1 hover:bg-base-200/40 transition-colors cursor-pointer"
+                className={`relative flex items-center gap-3 px-1 hover:bg-base-200/40 transition-colors cursor-pointer ${
+                  compact ? "py-2" : "py-3"
+                }`}
                 onClick={() => navigate(`/chat/${u.id}`)}
               >
-                <ProfileAvatar src={u.avatar} name={u.name} size="w-12 h-12" textSize="text-lg" />
+                <ProfileAvatar
+                  src={u.avatar}
+                  name={u.name}
+                  size={compact ? "w-9 h-9" : "w-12 h-12"}
+                  textSize={compact ? "text-sm" : "text-lg"}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2 sm:gap-3">
                     <div className={`font-medium truncate ${u.unread > 0 ? "font-bold" : ""}`}>{u.name}</div>

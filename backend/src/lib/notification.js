@@ -1,5 +1,6 @@
+import logger from "../monitoring/logger.js";
 import Notification from "../models/Notification.js";
-import { getOnlineUsers, getIO } from "./socket.js";
+import { getIO, presenceManager } from "./socket.js";
 
 export async function createNotification({
   recipient,
@@ -28,15 +29,15 @@ export async function createNotification({
       { path: "spark", select: "videoUrl caption" },
     ]);
 
-    // 3. Emit via Socket.io
+    // 3. Emit via Socket.io (all user sockets for multi-device)
     const io = getIO();
-    const recipientSocketId = getOnlineUsers().get(recipient.toString());
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("new-notification", populated);
-    }
+    const recipientSocketIds = presenceManager.getUserSocketIds(recipient.toString());
+    recipientSocketIds.forEach((sid) => {
+      io.to(sid).emit("new-notification", populated);
+    });
 
     return populated;
   } catch (error) {
-    console.error("Error creating notification:", error.message);
+    logger.error("Error creating notification:", error.message);
   }
 }

@@ -1,32 +1,40 @@
-import { LayoutDashboardIcon, UsersIcon, MessageSquareIcon, ShieldAlertIcon, ShieldCheckIcon, BarChart3Icon, Settings2Icon, HistoryIcon, ShieldIcon, XIcon, MegaphoneIcon, FilterIcon, HardDriveIcon, DatabaseIcon } from "lucide-react";
+import { 
+  LayoutDashboardIcon, UsersIcon, MessageSquareIcon, ShieldAlertIcon, 
+  ShieldCheckIcon, BarChart3Icon, Settings2Icon, HistoryIcon, ShieldIcon, 
+  XIcon, MegaphoneIcon, FilterIcon, HardDriveIcon, KeyRoundIcon, Trash2Icon,
+  TagIcon, CheckCircleIcon, BanIcon, SmartphoneIcon, CrownIcon, LoaderPinwheel
+} from "lucide-react";
+import { Link } from "react-router";
 
 const ADMIN_MENU_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
-  { id: "broadcasts", label: "Global Broadcasts", icon: MegaphoneIcon },
-  { id: "automod", label: "Auto-Moderation", icon: FilterIcon },
   { id: "users", label: "User Management", icon: UsersIcon },
+  { id: "usernames", label: "Username Management", icon: TagIcon },
+  { id: "verification", label: "Verification Management", icon: CheckCircleIcon },
   { id: "groups", label: "Groups & Chats", icon: MessageSquareIcon },
-  { id: "moderation", label: "Moderation (Reports)", icon: ShieldAlertIcon },
-  { id: "security", label: "Security & IP Ban", icon: ShieldCheckIcon },
+  { id: "moderation", label: "Moderation & Reports", icon: ShieldAlertIcon },
+  { id: "automod", label: "Auto Moderation", icon: FilterIcon },
+  { id: "security", label: "Security Center", icon: ShieldCheckIcon },
+  { id: "appeals", label: "Password Appeals", icon: KeyRoundIcon },
+  { id: "account-deletions", label: "Account Deletions", icon: Trash2Icon },
+  { id: "banned", label: "Banned Users", icon: BanIcon },
+  { id: "devices", label: "Device Management", icon: SmartphoneIcon },
+  { id: "broadcasts", label: "Global Broadcasts", icon: MegaphoneIcon },
   { id: "media", label: "Media & Storage", icon: HardDriveIcon },
   { id: "analytics", label: "Analytics", icon: BarChart3Icon },
   { id: "audit", label: "Audit Logs", icon: HistoryIcon },
-  { id: "compliance", label: "Data & GDPR", icon: DatabaseIcon },
   { id: "settings", label: "App Settings", icon: Settings2Icon },
+  { id: "admins", label: "Admin Management", icon: CrownIcon },
 ];
 
 const AdminSidebar = ({ activeTab, onTabChange }) => {
   return (
     <div className="w-64 bg-base-200 border-r border-base-300 flex flex-col h-full overflow-y-auto shadow-2xl lg:shadow-none">
-      <div className="p-6 border-b border-base-300 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-primary">
-          <ShieldIcon className="size-6 font-bold" />
-          <span className="text-xl font-bold tracking-tight">Admin Console</span>
-        </div>
-        {/* On mobile, users might want an explicit close button inside the sidebar too */}
+      {/* Mobile Close Button (Hidden on Desktop) */}
+      <div className="p-4 border-b border-base-300 flex justify-end lg:hidden">
         <button 
-          onClick={() => onTabChange(activeTab)} // This is a bit of a hack, but AdminPage handleTabChange closes it
-          className="btn btn-ghost btn-sm btn-circle lg:hidden"
+          onClick={() => onTabChange(activeTab)} 
+          className="btn btn-ghost btn-sm btn-circle"
         >
            <XIcon className="size-5" />
         </button>

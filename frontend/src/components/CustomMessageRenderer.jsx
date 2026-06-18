@@ -39,7 +39,17 @@ const CustomMessageRenderer = ({ socket, isGroupChat, isGroupAdmin, ...restProps
   const senderName = message?.user?.name || "Unknown";
   const tickStatus = isOwn ? getTickStatus(message) : null;
 
-  // If the message has been deleted, let Stream native renderer handle it
+  // Hide completely if deleted for me
+  try {
+    const deletedForMe = JSON.parse(localStorage.getItem("deletedMessagesForMe") || "[]");
+    if (message?.id && deletedForMe.includes(message.id)) {
+      return null;
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+
+  // If the message has been deleted globally, let Stream native renderer handle it
   // (it will display the "Message deleted" tombstone)
   if (message?.type === "deleted" || message?.deleted_at) {
     return <MessageSimple {...restProps} />;
@@ -55,7 +65,7 @@ const CustomMessageRenderer = ({ socket, isGroupChat, isGroupAdmin, ...restProps
 
   if (voiceAttachment) {
     return (
-      <div className={`cmr-row ${isOwn ? "cmr-row-own" : "cmr-row-other"}`}>
+      <div className={`premium-bubble-wrapper ${isOwn ? "own" : "other"}`}>
         <CustomMessageActionBar isOwn={isOwn} isGroupAdmin={isGroupAdmin} isGroupChat={isGroupChat}>
           <VoiceMessageBubble
             audioSrc={voiceAttachment.audio_src}
@@ -76,7 +86,7 @@ const CustomMessageRenderer = ({ socket, isGroupChat, isGroupAdmin, ...restProps
 
   if (pollId) {
     return (
-      <div className={`cmr-row ${isOwn ? "cmr-row-own" : "cmr-row-other"}`}>
+      <div className={`premium-bubble-wrapper ${isOwn ? "own" : "other"}`}>
         <CustomMessageActionBar isOwn={isOwn} isGroupAdmin={isGroupAdmin} isGroupChat={isGroupChat}>
           <PollBubble
             pollId={pollId}

@@ -43,11 +43,18 @@ const NotificationsPage = () => {
     },
   });
 
-  const { mutate: acceptRequestMutation, isPending } = useMutation({
+  const { mutate: acceptRequestMutation, isPending: isAccepting } = useMutation({
     mutationFn: acceptFriendRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
       queryClient.invalidateQueries({ queryKey: ["friends"] });
+    },
+  });
+
+  const { mutate: rejectRequestMutation, isPending: isRejecting } = useMutation({
+    mutationFn: rejectFriendRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
     },
   });
 
@@ -71,7 +78,7 @@ const NotificationsPage = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       {/* audio */}
-      <audio ref={audioRef} src="/notification.mp3" preload="auto" />
+      <audio ref={audioRef} src="/notification.wav" preload="auto" />
       <div className="container mx-auto space-y-10">
         {/* Nav */}
         
@@ -132,13 +139,22 @@ const NotificationsPage = () => {
                             </div>
                           </div>
 
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => acceptRequestMutation(request._id)}
-                            disabled={isPending}
-                          >
-                            Accept
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => rejectRequestMutation(request._id)}
+                              disabled={isAccepting || isRejecting}
+                            >
+                              Remove
+                            </button>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => acceptRequestMutation(request._id)}
+                              disabled={isAccepting || isRejecting}
+                            >
+                              Accept
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

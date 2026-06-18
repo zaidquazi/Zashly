@@ -1,34 +1,52 @@
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router";
-import { useEffect } from "react";
-
-import HomePage from "./pages/HomePage.jsx";
-import SignUpPage from "./pages/SignUpPage.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
-import NotificationsPage from "./pages/NotificationsPage.jsx";
-import CallPage from "./pages/CallPage.jsx";
-import SettingsPage from "./pages/SettingsPage.jsx";
-import ChatPage from "./pages/ChatPage.jsx";
-import GroupChatPage from "./pages/GroupChatPage.jsx";
-import GroupsPage from "./pages/GroupsPage.jsx";
-import OnboardingPage from "./pages/OnboardingPage.jsx";
-import FriendsPage from "./pages/FriendsPage.jsx";
-import EditProfilePage from "./pages/EditProfilePage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
-import CallsPage from "./pages/CallsPage.jsx";
 
 import { Toaster } from "react-hot-toast";
 
 import PageLoader from "./components/PageLoader.jsx";
+import RouteSeo from "./components/seo/RouteSeo.jsx";
 import useAuthUser from "./hooks/useAuthUser.js";
 import Layout from "./components/Layout.jsx";
 import { useThemeStore } from "./store/useThemeStore.js";
 import useNotifications from "./hooks/useNotifications.js";
 import useGlobalAnnouncements from "./hooks/useGlobalAnnouncements.jsx";
-import CallProvider from "./components/CallProvider.jsx";
+
+const CallOverlay = lazy(() =>
+  import("./features/calls/index.jsx").then((m) => ({ default: m.CallOverlay }))
+);
+import "./features/calls/call-ui.css";
+
+// Eager — small, frequently used
+import HomePage from "./pages/HomePage.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import SignUpPage from "./pages/SignUpPage.jsx";
+import OnboardingPage from "./pages/OnboardingPage.jsx";
+
+// Lazy — heavy or marketing pages
+const LandingPage = lazy(() => import("./pages/public/LandingPage.jsx"));
+const FeaturesPage = lazy(() => import("./pages/public/FeaturesPage.jsx"));
+const AboutPage = lazy(() => import("./pages/public/AboutPage.jsx"));
+const PrivacyPolicyPage = lazy(() => import("./pages/public/PrivacyPolicyPage.jsx"));
+const TermsPage = lazy(() => import("./pages/public/TermsPage.jsx"));
+const FriendsPage = lazy(() => import("./pages/FriendsPage.jsx"));
+const GroupsPage = lazy(() => import("./pages/GroupsPage.jsx"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage.jsx"));
+const ChatPage = lazy(() => import("./pages/ChatPage.jsx"));
+const GroupChatPage = lazy(() => import("./pages/GroupChatPage.jsx"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+const CallHistoryPage = lazy(() => import("./pages/CallHistoryPage.jsx"));
+const CallPage = lazy(() => import("./pages/CallPage.jsx"));
+const GroupCallPage = lazy(() => import("./pages/GroupCallPage.jsx"));
+const EditProfilePage = lazy(() => import("./pages/EditProfilePage.jsx"));
+const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
 
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
   const { theme } = useThemeStore();
+
+  const onboardedHome = authUser && ["admin", "moderator", "owner"].includes(authUser.role) 
+    ? "/admin" 
+    : "/app";
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -37,10 +55,7 @@ const App = () => {
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
 
-  // 🔔 Global WhatsApp-style notifications (sound + browser push)
   useNotifications();
-
-  // 📢 Global Admin Announcements
   useGlobalAnnouncements();
 
   useEffect(() => {
@@ -56,193 +71,181 @@ const App = () => {
 
   if (isLoading) return <PageLoader />;
 
+  const authApp = (child) =>
+    isAuthenticated && isOnboarded ? (
+      child
+    ) : (
+      <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
+    );
+
   return (
     <div className="min-h-screen">
-      {/* 📞 Global Call Provider — handles incoming/outgoing calls app-wide */}
-      {isAuthenticated && isOnboarded && <CallProvider />}
+      <RouteSeo />
 
-      <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated && isOnboarded ? (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Public marketing & legal */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated && isOnboarded ? (
+                <Navigate to={onboardedHome} replace />
+              ) : (
+                <LandingPage />
+              )
+            }
+          />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+
+          {/* Auth */}
+          <Route
+            path="/signup"
+            element={
+              !isAuthenticated ? (
+                <SignUpPage />
+              ) : (
+                <Navigate to={isOnboarded ? onboardedHome : "/onboarding"} replace />
+              )
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              !isAuthenticated ? (
+                <LoginPage />
+              ) : (
+                <Navigate to={isOnboarded ? onboardedHome : "/onboarding"} replace />
+              )
+            }
+          />
+          <Route
+            path="/onboarding"
+            element={
+              isAuthenticated ? (
+                !isOnboarded ? (
+                  <OnboardingPage />
+                ) : (
+                  <Navigate to={onboardedHome} replace />
+                )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          {/* Authenticated app (noindex via RouteSeo) */}
+          <Route
+            path="/app"
+            element={authApp(
               <Layout showSidebar={true}>
                 <HomePage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* 👥 Friends */}
-        <Route
-          path="/friends"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/friends"
+            element={authApp(
               <Layout showSidebar={true}>
                 <FriendsPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* 💬 Groups */}
-        <Route
-          path="/groups"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/groups"
+            element={authApp(
               <Layout showSidebar={true}>
                 <GroupsPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* 📞 Calls */}
-        <Route
-          path="/calls"
-          element={
-            isAuthenticated && isOnboarded ? (
-              <Layout showSidebar={true}>
-                <CallsPage />
-              </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        <Route
-          path="/signup"
-          element={
-            !isAuthenticated ? <SignUpPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} />
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            !isAuthenticated ? <LoginPage /> : <Navigate to={isOnboarded ? "/" : "/onboarding"} />
-          }
-        />
-        <Route
-          path="/notifications"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/notifications"
+            element={authApp(
               <Layout showSidebar={true}>
                 <NotificationsPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-        <Route
-          path="/call/:id"
-          element={
-            isAuthenticated && isOnboarded ? (
-              <CallPage />
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        <Route
-          path="/chat/:id"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/chat/:id"
+            element={authApp(
               <Layout showSidebar={false}>
                 <ChatPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* Group Chat */}
-        <Route
-          path="/group/:groupId"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/group/:groupId"
+            element={authApp(
               <Layout showSidebar={false}>
                 <GroupChatPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* Edit Profile */}
-        <Route
-          path="/edit-profile"
-          element={
-            isAuthenticated && isOnboarded ? (
+            )}
+          />
+          <Route
+            path="/edit-profile"
+            element={authApp(
               <Layout showSidebar={true}>
                 <EditProfilePage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        <Route
-          path="/onboarding"
-          element={
-            isAuthenticated ? (
-              !isOnboarded ? (
-                <OnboardingPage />
+            )}
+          />
+          <Route
+            path="/admin"
+            element={
+              isAuthenticated && isOnboarded ? (
+                ["admin", "moderator", "owner"].includes(authUser?.role) ? (
+                  <Layout showSidebar={false}>
+                    <AdminPage />
+                  </Layout>
+                ) : (
+                  <Navigate to={onboardedHome} replace />
+                )
               ) : (
-                <Navigate to="/" />
+                <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} replace />
               )
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-
-        {/* 🛡️ Admin Panel */}
-        <Route
-          path="/admin"
-          element={
-            isAuthenticated && isOnboarded ? (
-              authUser?.role === "admin" ? (
-                <Layout showSidebar={true}>
-                  <AdminPage />
-                </Layout>
-              ) : (
-                <Navigate to="/" />
-              )
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-
-        {/* ⚙️ Settings Panel */}
-        <Route
-          path="/settings"
-          element={
-            isAuthenticated && isOnboarded ? (
+            }
+          />
+          <Route
+            path="/settings"
+            element={authApp(
               <Layout showSidebar={true}>
                 <SettingsPage />
               </Layout>
-            ) : (
-              <Navigate to={!isAuthenticated ? "/login" : "/onboarding"} />
-            )
-          }
-        />
-      </Routes>
+            )}
+          />
+          <Route
+            path="/calls"
+            element={authApp(
+              <Layout showSidebar={true}>
+                <CallHistoryPage />
+              </Layout>
+            )}
+          />
+          <Route
+            path="/call/:userId"
+            element={authApp(<CallPage />)}
+          />
+          <Route
+            path="/group-call/:groupId"
+            element={authApp(<GroupCallPage />)}
+          />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
 
       <Toaster />
+      {isAuthenticated && isOnboarded && (
+        <Suspense fallback={null}>
+          <CallOverlay />
+        </Suspense>
+      )}
     </div>
   );
 };
+
 export default App;

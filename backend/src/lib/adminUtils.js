@@ -1,3 +1,4 @@
+import logger from "../monitoring/logger.js";
 import AdminLog from "../models/AdminLog.js";
 
 export async function logAdminAction({ adminId, action, targetUserId, details, ipAddress }) {
@@ -10,6 +11,6 @@ export async function logAdminAction({ adminId, action, targetUserId, details, i
       ipAddress,
     });
   } catch (error) {
-    console.error("Failed to log admin action:", error.message);
+    logger.error("Failed to log admin action:", error.message);
   }
 }

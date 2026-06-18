@@ -1,25 +1,35 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
+import { validate } from "../middleware/security/validate.middleware.js";
+import { asyncHandler } from "../middleware/security/asyncHandler.middleware.js";
 import {
-  initiateCall,
-  answerCall,
+  createRoom,
+  getToken,
   endCall,
-  getCallHistory,
-  getAllCallHistory,
-  checkUserOnline,
-  deleteCallLog,
-  clearCallHistory,
+  getHistory,
+  getCall,
+  removeCall,
+  removeParticipant,
+  getCallConfig,
 } from "../controllers/call.controller.js";
+import {
+  createRoomSchema,
+  tokenSchema,
+  endCallSchema,
+  callIdParam,
+  historyQuery,
+  removeParticipantSchema,
+} from "../validators/call.validators.js";
 
 const router = express.Router();
 
-router.post("/initiate", protectRoute, initiateCall);
-router.post("/answer", protectRoute, answerCall);
-router.post("/end", protectRoute, endCall);
-router.get("/history", protectRoute, getAllCallHistory);
-router.get("/history/:targetId", protectRoute, getCallHistory);
-router.delete("/history/clear", protectRoute, clearCallHistory);
-router.delete("/:logId", protectRoute, deleteCallLog);
-router.get("/check-online/:userId", protectRoute, checkUserOnline);
+router.get("/config", protectRoute, asyncHandler(getCallConfig));
+router.post("/create-room", protectRoute, validate(createRoomSchema), asyncHandler(createRoom));
+router.post("/token", protectRoute, validate(tokenSchema), asyncHandler(getToken));
+router.post("/end", protectRoute, validate(endCallSchema), asyncHandler(endCall));
+router.get("/history", protectRoute, validate(historyQuery), asyncHandler(getHistory));
+router.get("/:id", protectRoute, validate(callIdParam), asyncHandler(getCall));
+router.delete("/:id", protectRoute, validate(callIdParam), asyncHandler(removeCall));
+router.post("/remove-participant", protectRoute, validate(removeParticipantSchema), asyncHandler(removeParticipant));
 
 export default router;

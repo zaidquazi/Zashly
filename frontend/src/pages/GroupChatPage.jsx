@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGroupById } from "../lib/groupApi";
 import useAuthUser from "../hooks/useAuthUser";
 import { getStreamToken } from "../lib/api";
-import useStartCall from "../hooks/useStartCall";
+import { connectStreamUser } from "../lib/streamClient";
 import GroupInfoPanel from "../components/GroupInfoPanel";
 import PinnedMessagesBar from "../components/PinnedMessagesBar";
 import ChatEffectsWrapper from "../components/ChatEffectsWrapper";
@@ -17,18 +17,29 @@ import {
   Thread,
   Window,
   useChannelStateContext,
+  useChatContext,
 } from "stream-chat-react";
 import { StreamChat } from "stream-chat";
 import toast from "react-hot-toast";
 
+import "../chat-redesign.css";
 import ChatLoader from "../components/ChatLoader";
-import { InfoIcon, Phone, Video, Trash2Icon } from "lucide-react";
+import { InfoIcon, Trash2Icon, Moon, Sun, Phone, Video } from "lucide-react";
+import { useCallSession } from "../features/calls/hooks/useCallSession";
+import useCallStore from "../features/calls/store/callSlice";
 import CustomMessageRenderer from "../components/CustomMessageRenderer";
 import CustomMessageInput from "../components/CustomMessageInput";
 import useSocket from "../hooks/useSocket";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5002";
+const currentHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
+let envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
+
+if (envApiUrl.includes("localhost") && currentHost !== "localhost") {
+  envApiUrl = envApiUrl.replace("localhost", currentHost);
+}
+
+const SOCKET_URL = envApiUrl || `http://${currentHost}:5002`;
 
 // ── Gradient helper ────────────────────────────────────────
 function getAvatarGradient(name) {
@@ -54,15 +65,25 @@ const GroupChatPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { authUser } = useAuthUser();
-  const { startCall } = useStartCall();
 
   const [chatClient, setChatClient] = useState(null);
   const [channel, setChannel] = useState(null);
+  const [chatTheme, setChatTheme] = useState(() => {
+    return localStorage.getItem("stream-chat-theme") || "str-chat__theme-dark";
+  });
+
+  const toggleChatTheme = () => {
+    const newTheme = chatTheme === "str-chat__theme-dark" ? "str-chat__theme-light" : "str-chat__theme-dark";
+    setChatTheme(newTheme);
+    localStorage.setItem("stream-chat-theme", newTheme);
+  };
   const [loading, setLoading] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const socketRef = useRef(null);
   const { socket } = useSocket();
+  const { startGroupCall } = useCallSession();
+  const callState = useCallStore((s) => s.callState);
 
   const CustomGroupHeader = ({ group }) => {
     const { watcher_count } = useChannelStateContext();
@@ -72,9 +93,9 @@ const GroupChatPage = () => {
     const onlineCount = watcher_count ?? 0;
 
     return (
-      <div className="chat-header-3d">
-        <div className="chat-header-user">
-          <div className="chat-header-avatar-wrap">
+      <div className="premium-chat-header">
+        <div className="premium-chat-header-info" onClick={() => setShowInfo(true)}>
+          <div className="relative">
             <div
               className="str-chat__avatar str-chat__avatar--rounded"
               style={{ width: 40, height: 40, flexShrink: 0 }}
@@ -99,48 +120,58 @@ const GroupChatPage = () => {
               )}
             </div>
           </div>
-          <div className="chat-header-info">
-            <p className="chat-header-name">
+          <div className="premium-chat-header-text">
+            <p className="premium-chat-header-name">
               {group.name}
             </p>
-            <p className="chat-header-status">
+            <p className="premium-chat-header-status">
               {group.members?.length ?? 0} members{onlineCount > 0 ? `, ${onlineCount} online` : ""}
             </p>
           </div>
         </div>
 
-        <div className="chat-header-actions">
+        <div className="premium-chat-header-actions">
           <button
-            className="chat-header-action-btn"
-            onClick={handleVoiceCall}
-            title="Voice Call"
+            type="button"
+            className="premium-icon-btn call-voice"
+            disabled={callState !== "idle"}
+            onClick={(e) => {
+              e.stopPropagation();
+              startGroupCall({ groupId, groupName: group.name, type: "voice" });
+            }}
+            title="Group voice call"
           >
-            <Phone className="size-4 sm:size-5 text-success" />
+            <Phone className="size-4 sm:size-5" />
+          </button>
+          <button
+            type="button"
+            className="premium-icon-btn call-video"
+            disabled={callState !== "idle"}
+            onClick={(e) => {
+              e.stopPropagation();
+              startGroupCall({ groupId, groupName: group.name, type: "video" });
+            }}
+            title="Group video call"
+          >
+            <Video className="size-4 sm:size-5" />
+          </button>
+          <button
+            type="button"
+            className="premium-icon-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleChatTheme();
+            }}
+            title="Toggle Theme"
+          >
+            {chatTheme === "str-chat__theme-dark" ? (
+              <Sun className="size-4 sm:size-5 text-warning" />
+            ) : (
+              <Moon className="size-4 sm:size-5" />
+            )}
           </button>
 
-          <button
-            className="chat-header-action-btn"
-            onClick={handleVideoCall}
-            title="Video Call"
-          >
-            <Video className="size-4 sm:size-5 text-primary" />
-          </button>
 
-          <button
-            className="chat-header-action-btn chat-header-action-danger"
-            onClick={() => setShowClearModal(true)}
-            title="Clear Chat"
-          >
-            <Trash2Icon className="size-4 sm:size-5" />
-          </button>
-
-          <button
-            className="chat-header-action-btn"
-            onClick={() => setShowInfo(true)}
-            title="Group Info"
-          >
-            <InfoIcon className="size-4 sm:size-5" />
-          </button>
         </div>
       </div>
     );
@@ -156,6 +187,8 @@ const GroupChatPage = () => {
     queryFn: () => getGroupById(groupId),
     enabled: !!groupId,
   });
+
+
 
   // 2. Fetch Stream Token
   const { data: tokenData } = useQuery({
@@ -177,34 +210,10 @@ const GroupChatPage = () => {
       if (!tokenData?.token || !authUser || !group || !groupId) return;
 
       try {
-        const client = StreamChat.getInstance(STREAM_API_KEY);
         const desiredId = String(authUser._id);
         
-        // Only pass image if it's a URL, not a base64 string
-        const userImage = authUser.profilePic && !authUser.profilePic.startsWith('data:') 
-          ? authUser.profilePic 
-          : '';
-
-        if (!client.userID) {
-          await client.connectUser(
-            {
-              id: desiredId,
-              name: authUser.fullName,
-              image: userImage,
-            },
-            tokenData.token
-          );
-        } else if (client.userID !== desiredId) {
-          await client.disconnectUser();
-          await client.connectUser(
-            {
-              id: desiredId,
-              name: authUser.fullName,
-              image: userImage,
-            },
-            tokenData.token
-          );
-        }
+        const client = await connectStreamUser(authUser, tokenData.token);
+        if (!client) return;
 
         // Map local members to Stream IDs
         const memberIds = group.members.map(m => String(m._id));
@@ -252,32 +261,6 @@ const GroupChatPage = () => {
     }
   };
 
-  const handleVoiceCall = () => {
-    if (!group) return;
-    startCall({
-      callType: "voice",
-      type: "group",
-      targetId: groupId,
-      targetName: group.name,
-      targetPic: group.avatar || "",
-      groupName: group.name,
-      groupId,
-    });
-  };
-
-  const handleVideoCall = () => {
-    if (!group) return;
-    startCall({
-      callType: "video",
-      type: "group",
-      targetId: groupId,
-      targetName: group.name,
-      targetPic: group.avatar || "",
-      groupName: group.name,
-      groupId,
-    });
-  };
-
   const handleClearChat = async () => {
     try {
       await channel.truncate();
@@ -305,13 +288,17 @@ const GroupChatPage = () => {
 
   const PinnedMessagesSection = () => {
     const { pinnedMessages, channel } = useChannelStateContext();
+    const { client } = useChatContext();
     
     if (!pinnedMessages || pinnedMessages.length === 0) return null;
 
     const handleUnpin = async (messageId) => {
       try {
-        await channel.unpinMessage(messageId);
-        toast.success("Message unpinned");
+        const msgToUnpin = pinnedMessages.find(m => m.id === messageId);
+        if (msgToUnpin) {
+          await client.unpinMessage(msgToUnpin);
+          toast.success("Message unpinned");
+        }
       } catch (err) {
         toast.error("Failed to unpin");
       }
@@ -337,7 +324,7 @@ const GroupChatPage = () => {
       <div className="h-full gc-outer-bg flex items-center justify-center">
         <div className="text-center">
           <p className="text-lg font-semibold">Group not found</p>
-          <button className="btn btn-primary btn-sm mt-2" onClick={() => navigate("/")}>
+          <button className="btn btn-primary btn-sm mt-2" onClick={() => navigate("/app")}>
             Go Home
           </button>
         </div>
@@ -358,20 +345,46 @@ const GroupChatPage = () => {
 
   return (
     <div className="h-full overflow-hidden relative">
-      <Chat client={chatClient}>
+      <Chat client={chatClient} theme={chatTheme}>
         <Channel channel={channel}>
           <ChatEffectsWrapper showBackground={showThreeBackground}>
             {({ onSendParticles }) => (
               <div 
-                className={`w-full h-full relative transition-all duration-500 ${authUser?.chatWallpaper ? 'bg-transparent' : 'chat-3d-bg'}`}
+                className={`w-full h-full relative transition-all duration-500 ${
+                  authUser?.chatWallpaper 
+                    ? 'bg-transparent' 
+                    : chatTheme === 'str-chat__theme-light'
+                      ? 'bg-base-100 text-base-content'
+                      : 'chat-3d-bg'
+                }`}
                 style={chatWallpaperStyle}
               >
                 {/* Stream Window with custom header that syncs with MongoDB */}
                 <Window>
-                  <CustomGroupHeader group={group} />
+                  <CustomGroupHeader
+                    group={group}
+                  />
                   <PinnedMessagesSection />
                   <MessageList Message={MessageWithExtras} />
-                  <MessageInput focus Input={(props) => <CustomMessageInput {...props} isGroupChat={true} onSendParticles={onSendParticles} />} />
+                  <MessageInput
+                    focus
+                    additionalTextareaProps={{
+                      onKeyDown: (e) => {
+                        const enterToSend =
+                          authUser?.appSettings?.general?.enterToSend ?? true;
+                        if (!enterToSend && e.key === "Enter" && !e.shiftKey) {
+                          e.stopPropagation();
+                        }
+                      },
+                    }}
+                    Input={(props) => (
+                      <CustomMessageInput
+                        {...props}
+                        isGroupChat={true}
+                        onSendParticles={onSendParticles}
+                      />
+                    )}
+                  />
                 </Window>
 
 

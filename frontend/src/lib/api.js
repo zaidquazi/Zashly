@@ -1,4 +1,4 @@
-import { axiosInstance } from "./axios";
+import { axiosInstance, executeTokenRefresh } from "./axios";
 
 export const signup = async (signupData) => {
   const response = await axiosInstance.post("/auth/signup", signupData);
@@ -11,6 +11,20 @@ export const login = async (loginData) => {
 };
 export const logout = async () => {
   const response = await axiosInstance.post("/auth/logout");
+  return response.data;
+};
+
+export const logoutAllDevices = async () => {
+  const response = await axiosInstance.post("/auth/logout-all");
+  return response.data;
+};
+
+export const refreshSession = async () => {
+  return executeTokenRefresh();
+};
+
+export const getActiveSessions = async () => {
+  const response = await axiosInstance.get("/auth/sessions");
   return response.data;
 };
 
@@ -36,7 +50,9 @@ export const completeOnboarding = async (userData) => {
 };
 
 export async function getUserFriends() {
-  const response = await axiosInstance.get("/users/friends");
+  const response = await axiosInstance.get("/users/friends", {
+    params: { _t: Date.now() },
+  });
   return response.data;
 }
 
@@ -67,6 +83,11 @@ export async function acceptFriendRequest(requestId) {
 
 export async function rejectFriendRequest(requestId) {
   const response = await axiosInstance.put(`/users/friend-request/${requestId}/reject`);
+  return response.data;
+}
+
+export async function removeFriend(userId) {
+  const response = await axiosInstance.delete(`/users/friends/${userId}`);
   return response.data;
 }
 
@@ -160,5 +181,36 @@ export async function getNotifications() {
 
 export async function markAllNotificationsRead() {
   const res = await axiosInstance.put("/notifications/mark-all-read");
+  return res.data;
+}
+
+export const DELETION_CONFIRM_PHRASE = "DELETE MY ACCOUNT";
+
+export async function getMyDeletionRequest() {
+  const res = await axiosInstance.get("/users/me/deletion-request");
+  return res.data;
+}
+
+export async function downloadMyDataExport() {
+  const res = await axiosInstance.get("/users/me/data-export", {
+    responseType: "blob",
+  });
+  return res.data;
+}
+
+export async function submitAccountDeletionRequest(payload) {
+  const res = await axiosInstance.post("/users/me/deletion-request", payload);
+  return res.data;
+}
+
+export async function cancelAccountDeletionRequest() {
+  const res = await axiosInstance.delete("/users/me/deletion-request");
+  return res.data;
+}
+
+export async function checkUsernameAvailability(username) {
+  const res = await axiosInstance.get("/usernames/availability", {
+    params: { q: username }
+  });
   return res.data;
 }

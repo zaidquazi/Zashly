@@ -39,21 +39,31 @@ const CustomMessageActionBar = ({ children, isOwn, isGroupAdmin, isGroupChat }) 
     setShowMore(false);
     if (!message?.id) return;
     
-    setDeleting(type); // 'me' or 'everyone'
+    setDeleting(type); // 'everyone'
     try {
       if (type === "everyone") {
-        // Soft-delete globally
+        // Hard-delete globally
         if (!isOwn && isGroupAdmin && isGroupChat) {
           const groupId = client.activeChannels[message.cid]?.id;
           if (groupId) {
             await deleteGroupMessage(groupId, message.id);
           }
         } else {
-          await client.deleteMessage(message.id);
+          await client.deleteMessage(message.id, { hard: true });
         }
         toast.success("Deleted for everyone");
       } else if (type === "me") {
-        // Local state removal (hides it for this session)
+        try {
+          const deletedForMe = JSON.parse(localStorage.getItem("deletedMessagesForMe") || "[]");
+          if (!deletedForMe.includes(message.id)) {
+            deletedForMe.push(message.id);
+            localStorage.setItem("deletedMessagesForMe", JSON.stringify(deletedForMe));
+          }
+        } catch (e) {
+          // ignore
+        }
+        
+        // Local state removal (hides it for this session immediately)
         const channel = client.activeChannels[message.cid];
         if (channel) {
           channel.state.removeMessage({ id: message.id });

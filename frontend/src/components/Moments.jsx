@@ -28,6 +28,7 @@ export default function Moments() {
   const [preview, setPreview] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const visibleMoments = useMemo(() => moments, [moments]);
 
@@ -55,14 +56,24 @@ export default function Moments() {
 
   // --- Create moment mutation
   const createMutation = useMutation({
-    mutationFn: createMoment,
+    mutationFn: (variables) => createMoment({
+      ...variables,
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      }
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["moments"] });
       setPreview(null);
+      setUploadProgress(0);
       toast.success("Moment posted successfully!");
     },
     onError: (error) => {
       console.error("Upload error:", error);
+      setUploadProgress(0);
       toast.error(error?.response?.data?.message || "Failed to post moment");
     }
   });
@@ -122,10 +133,10 @@ export default function Moments() {
   const onUpload = async (file) => {
     if (!file) return;
 
-    // Check size before processing (limit to ~9MB to stay safe with Base64 overhead)
-    const MAX_SIZE = 9 * 1024 * 1024;
+    // Check size before processing (limit to ~55MB to stay safe with Base64 overhead)
+    const MAX_SIZE = 55 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      toast.error("File is too large. Max limit is 9MB.");
+      toast.error("File is too large. Max limit is 55MB.");
       return;
     }
 
@@ -168,6 +179,20 @@ export default function Moments() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl sm:text-2xl font-semibold">Moments</h2>
       </div>
+
+      {uploadProgress > 0 && (
+        <div className="mt-2 mb-1 flex items-center gap-3">
+          <div className="w-full bg-base-300 rounded-full h-1.5 overflow-hidden shadow-sm flex-1">
+            <div 
+              className="bg-primary h-full transition-all duration-200 ease-out" 
+              style={{ width: `${uploadProgress}%` }} 
+            />
+          </div>
+          <span className="text-xs font-semibold text-primary w-8 text-right">
+            {uploadProgress}%
+          </span>
+        </div>
+      )}
 
       <div className="relative">
         <div className="flex items-start gap-3 sm:gap-4 overflow-x-auto no-scrollbar pt-4 pb-2 px-2 sm:px-0">

@@ -2,15 +2,26 @@ import { useEffect, useRef, useCallback } from "react";
 import { StreamChat } from "stream-chat";
 import { useQuery } from "@tanstack/react-query";
 import { getStreamToken } from "../lib/api";
+import { connectStreamUser } from "../lib/streamClient";
 import useAuthUser from "./useAuthUser";
+import { getNotificationPrefs } from "../utils/appSettings";
 import useSocket from "./useSocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
+const MOMENT_TYPES = new Set([
+  "like",
+  "comment",
+  "spark_like",
+  "spark_comment",
+  "follow",
+]);
+
 const useNotifications = () => {
   const { authUser } = useAuthUser();
+  const notifPrefs = getNotificationPrefs(authUser);
   const notificationSoundRef = useRef(null);
   const hasPermissionRef = useRef(false);
   const { socket } = useSocket();
@@ -35,37 +46,35 @@ const useNotifications = () => {
     }
   }, []);
 
-  // â”€â”€ Create a reusable Audio element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
-    const audio = new Audio(`/notification.mp3?v=${Date.now()}`);
+    const audio = new Audio(`/notification.wav?v=${Date.now()}`);
     audio.volume = 0.6;
     audio.preload = "auto";
     audio.onerror = () => {
       notificationSoundRef.current = new Audio(
-        `/notification.mp3?nocache=${Date.now()}`
+        `/notification.wav?nocache=${Date.now()}`
       );
       notificationSoundRef.current.volume = 0.6;
     };
     notificationSoundRef.current = audio;
   }, []);
 
-  // â”€â”€ Play notification sound â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const playSound = useCallback(() => {
+    if (!notifPrefs.soundEnabled) return;
     try {
       const audio = notificationSoundRef.current;
       if (audio) {
         audio.currentTime = 0;
         audio.play().catch(() => {
-          // Browsers block autoplay until user interacts â€” silently ignore
         });
       }
-    } catch {
-      }
-  }, []);
+    } catch (err) {
+      console.debug("Audio play error", err);
+    }
+  }, [notifPrefs.soundEnabled]);
 
-  // â”€â”€ Show browser notification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const showBrowserNotification = useCallback((title, body, icon, onClick) => {
-    if (!hasPermissionRef.current) return;
+    if (!notifPrefs.desktopEnabled || !hasPermissionRef.current) return;
 
     try {
       const notification = new Notification(title, {
@@ -83,15 +92,16 @@ const useNotifications = () => {
       };
 
       setTimeout(() => notification.close(), 5000);
-    } catch {
+    } catch (err) {
+      console.debug("Notification error", err);
     }
-  }, []);
+  }, [notifPrefs.desktopEnabled]);
 
-  // ── Listener: New Friend Request (Socket.io) ──────────────────
   useEffect(() => {
     if (!socket) return;
 
     const handleNewFriendRequest = (data) => {
+      if (!notifPrefs.friendRequests) return;
       playSound();
       
       const senderName = data.senderName || "Someone";
@@ -111,11 +121,14 @@ const useNotifications = () => {
         duration: 5000,
       });
 
-      // Refresh the notifications page if the user is on it
       queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
     };
 
     const handleNewNotification = (data) => {
+      const isMoment = MOMENT_TYPES.has(data.type);
+      if (isMoment && !notifPrefs.moments) return;
+      if (!isMoment && !notifPrefs.messages) return;
+
       playSound();
 
       const senderName = data.sender?.fullName || "Someone";
@@ -160,9 +173,8 @@ const useNotifications = () => {
       socket.off("new-friend-request", handleNewFriendRequest);
       socket.off("new-notification", handleNewNotification);
     };
-  }, [socket, playSound, showBrowserNotification, queryClient]);
+  }, [socket, playSound, showBrowserNotification, queryClient, notifPrefs]);
 
-  // ── Listener: Stream Chat message.new ──────────────────────────
   useEffect(() => {
     if (!authUser?._id || !tokenData?.token || !STREAM_API_KEY) return;
 
@@ -171,40 +183,33 @@ const useNotifications = () => {
 
     const setup = async () => {
       try {
-        client = StreamChat.getInstance(STREAM_API_KEY);
         const userId = String(authUser._id);
-
-        if (!client.userID) {
-          const userImage =
-            authUser.profilePic && !authUser.profilePic.startsWith("data:")
-              ? authUser.profilePic
-              : "";
-          await client.connectUser(
-            { id: userId, name: authUser.fullName, image: userImage },
-            tokenData.token
-          );
-        }
+        const connectedClient = await connectStreamUser(authUser, tokenData.token);
+        if (!connectedClient) return;
+        
+        client = connectedClient;
 
         const handler = (event) => {
           if (event?.user?.id === userId) return;
           if (!event?.message) return;
 
+          const channelName = event.channel?.name;
+          const isGroup = Boolean(channelName);
+          if (isGroup && !notifPrefs.groups) return;
+          if (!isGroup && !notifPrefs.messages) return;
+
           // ── Check if user is currently viewing this chat ──
           const currentPath = window.location.pathname;
           const channelId = event.channel_id || event?.cid?.split(":")[1];
 
-          // 1-on-1: /chat/<otherUserId> — channel id is sorted ids joined with "-"
-          // Group:  /group/<groupId>   — channel id is the groupId
           const isViewingThisChat =
             currentPath === `/chat/${event.user.id}` ||
             currentPath === `/group/${channelId}`;
 
           if (isViewingThisChat) return;
 
-          // ── Play sound ──────────────────────────────────
           playSound();
 
-          // ── Determine notification content ──────────────
           const senderName = event.user?.name || event.user?.id || "Someone";
           const senderAvatar = event.user?.image || "/icon.png";
 
@@ -222,12 +227,10 @@ const useNotifications = () => {
             messagePreview = messagePreview.slice(0, 77) + "...";
           }
 
-          const channelName = event.channel?.name;
           const title = channelName
             ? `${senderName} in ${channelName}`
             : senderName;
 
-          // ── Show browser notification ───────────────────
           showBrowserNotification(title, messagePreview, senderAvatar, () => {
             if (channelName) {
               window.location.href = `/group/${channelId}`;
@@ -249,8 +252,13 @@ const useNotifications = () => {
     return () => {
       if (listenerCleanup) listenerCleanup();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser?._id, authUser?.fullName, authUser?.profilePic, tokenData?.token, playSound, showBrowserNotification]);
+  }, [
+    authUser,
+    tokenData?.token,
+    playSound,
+    showBrowserNotification,
+    notifPrefs,
+  ]);
 };
 
 export default useNotifications;

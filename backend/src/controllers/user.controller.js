@@ -1,7 +1,21 @@
+import logger from "../monitoring/logger.js";
 import User from "../models/User.js";
 import FriendRequest from "../models/FriendRequest.js";
 import { upsertStreamUser, streamClient } from "../lib/stream.js";
-import { getOnlineUsers, getIO } from "../lib/socket.js";
+import { presenceManager, getIO } from "../lib/socket.js";
+import { sanitizeText, sanitizeUrl } from "../utils/security/sanitize.util.js";
+import { escapeRegex } from "../utils/security/regex.util.js";
+import {
+  validateBase64Upload,
+  secureFilename,
+  safeUploadPath,
+} from "../uploads/security/fileValidator.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function updateProfile(req, res) {
   try {
@@ -9,10 +23,29 @@ export async function updateProfile(req, res) {
     const { fullName, bio, location, profilePic } = req.body;
 
     const updateData = {};
-    if (fullName !== undefined) updateData.fullName = fullName;
-    if (bio !== undefined) updateData.bio = bio;
-    if (location !== undefined) updateData.location = location;
-    if (profilePic !== undefined) updateData.profilePic = profilePic;
+    if (fullName !== undefined) updateData.fullName = sanitizeText(fullName, 100);
+    if (bio !== undefined) updateData.bio = sanitizeText(bio, 500);
+    if (location !== undefined) updateData.location = sanitizeText(location, 120);
+    if (profilePic !== undefined) {
+      if (profilePic && profilePic.startsWith("data:")) {
+        const validation = validateBase64Upload(profilePic, "image");
+        if (!validation.ok) {
+          return res.status(400).json({ message: validation.error });
+        }
+        const uploadRoot = path.join(__dirname, "../../uploads");
+        const filename = secureFilename(validation.ext);
+        const filepath = safeUploadPath(uploadRoot, filename);
+
+        // Ensure directory exists
+        if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot, { recursive: true });
+
+        fs.writeFileSync(filepath, validation.buffer);
+        const host = req.protocol + "://" + req.get("host");
+        updateData.profilePic = `${host}/uploads/${filename}`;
+      } else {
+        updateData.profilePic = profilePic ? sanitizeUrl(profilePic) : profilePic;
+      }
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -34,7 +67,7 @@ export async function updateProfile(req, res) {
 
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {
-    console.error("Error in updateProfile controller:", error.message);
+    logger.error("Error in updateProfile controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -44,16 +77,19 @@ export async function getRecommendedUsers(req, res) {
     const currentUserId = req.user.id;
     const currentUser = req.user;
 
-    const recommendedUsers = await User.find({
+    const queryFilter = {
       $and: [
         { _id: { $ne: currentUserId } },
         { _id: { $nin: currentUser.friends } },
         { isOnboarded: true },
+        { role: { $nin: ["admin", "owner"] } },
       ],
-    });
+    };
+
+    const recommendedUsers = await User.find(queryFilter).limit(20);
     res.status(200).json(recommendedUsers);
   } catch (error) {
-    console.error("Error in getRecommendedUsers controller", error.message);
+    logger.error("Error in getRecommendedUsers controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -64,16 +100,19 @@ export async function getMyFriends(req, res) {
       .select("friends")
       .populate("friends", "fullName profilePic nativeLanguage learningLanguage lastSeen privacySettings");
 
-    const onlineUsers = getOnlineUsers();
-
-    const friendsWithStatus = user.friends.map((friend) => ({
-      ...friend.toObject(),
-      isOnline: onlineUsers.has(friend._id.toString()),
-    }));
+    const friendsWithStatus = user.friends.map((friend) => {
+      const friendId = String(friend._id);
+      const isOnline = presenceManager.isOnline(friendId);
+      console.log(`[getMyFriends] Friend ${friend.fullName} (${friendId}): isOnline=${isOnline}`);
+      return {
+        ...friend.toObject(),
+        isOnline,
+      };
+    });
 
     res.status(200).json(friendsWithStatus);
   } catch (error) {
-    console.error("Error in getMyFriends controller", error.message);
+    logger.error("Error in getMyFriends controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -87,6 +126,10 @@ export async function sendFriendRequest(req, res) {
       return res.status(400).json({ message: "You can't send friend request to yourself" });
     }
 
+    if (["admin", "owner"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Admins cannot send friend requests" });
+    }
+
     const recipient = await User.findById(recipientId);
     if (!recipient) {
       return res.status(404).json({ message: "Recipient not found" });
@@ -98,8 +141,8 @@ export async function sendFriendRequest(req, res) {
 
     const existingRequest = await FriendRequest.findOne({
       $or: [
-        { senderId: myId, recipientId: recipientId },
-        { senderId: recipientId, recipientId: myId },
+        { sender: myId, recipient: recipientId },
+        { sender: recipientId, recipient: myId },
       ],
     });
 
@@ -119,9 +162,9 @@ export async function sendFriendRequest(req, res) {
     });
 
     const io = getIO();
-    const recipientSocketId = getOnlineUsers().get(recipientId);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("new-friend-request", {
+    const recipientSocketIds = presenceManager.getUserSocketIds(recipientId);
+    recipientSocketIds.forEach((sid) => {
+      io.to(sid).emit("new-friend-request", {
         _id: friendRequest._id,
         sender: {
           _id: sender._id,
@@ -132,11 +175,11 @@ export async function sendFriendRequest(req, res) {
         status: "pending",
         createdAt: friendRequest.createdAt,
       });
-    }
+    });
 
     res.status(201).json(friendRequest);
   } catch (error) {
-    console.error("Error in sendFriendRequest controller", error.message);
+    logger.error("Error in sendFriendRequest controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -151,12 +194,15 @@ export async function acceptFriendRequest(req, res) {
       return res.status(404).json({ message: "Friend request not found" });
     }
 
-    if (friendRequest.recipient.toString() !== req.user.id) {
+    if (["admin", "owner"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Admins cannot accept friend requests" });
+    }
+
+    if (friendRequest.recipient.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "You are not authorized to accept this request" });
     }
 
-    friendRequest.status = "accepted";
-    await friendRequest.save();
+    await FriendRequest.findByIdAndUpdate(requestId, { status: "accepted" });
 
     await User.findByIdAndUpdate(friendRequest.sender, {
       $addToSet: { friends: friendRequest.recipient },
@@ -168,7 +214,7 @@ export async function acceptFriendRequest(req, res) {
 
     res.status(200).json({ message: "Friend request accepted" });
   } catch (error) {
-    console.error("Error in acceptFriendRequest controller", error.message);
+    logger.error("Error in acceptFriendRequest controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -183,16 +229,54 @@ export async function rejectFriendRequest(req, res) {
       return res.status(404).json({ message: "Friend request not found" });
     }
 
-    if (friendRequest.recipient.toString() !== req.user.id) {
+    if (friendRequest.recipient.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "You are not authorized to reject this request" });
     }
 
-    friendRequest.status = "rejected";
-    await friendRequest.save();
+    await FriendRequest.findByIdAndDelete(requestId);
 
-    res.status(200).json({ message: "Friend request rejected" });
+    res.status(200).json({ message: "Friend request rejected and removed" });
   } catch (error) {
-    console.error("Error in rejectFriendRequest controller", error.message);
+    logger.error("Error in rejectFriendRequest controller", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function removeFriend(req, res) {
+  try {
+    const myId = req.user.id;
+    const { id: friendId } = req.params;
+
+    if (myId === friendId) {
+      return res.status(400).json({ message: "You cannot remove yourself" });
+    }
+
+    const friend = await User.findById(friendId);
+    if (!friend) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check they are actually friends
+    const me = await User.findById(myId);
+    if (!me.friends.map((f) => f.toString()).includes(friendId)) {
+      return res.status(400).json({ message: "This user is not in your friends list" });
+    }
+
+    // Remove from both users' friends arrays
+    await User.findByIdAndUpdate(myId, { $pull: { friends: friendId } });
+    await User.findByIdAndUpdate(friendId, { $pull: { friends: myId } });
+
+    // Clean up any accepted friend requests between the two users
+    await FriendRequest.deleteMany({
+      $or: [
+        { sender: myId, recipient: friendId },
+        { sender: friendId, recipient: myId },
+      ],
+    });
+
+    res.status(200).json({ message: "Friend removed successfully" });
+  } catch (error) {
+    logger.error("Error in removeFriend controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -211,7 +295,7 @@ export async function getFriendRequests(req, res) {
 
     res.status(200).json({ incomingReqs, acceptedReqs });
   } catch (error) {
-    console.error("Error in getPendingFriendRequests controller", error.message);
+    logger.error("Error in getPendingFriendRequests controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -225,7 +309,7 @@ export async function getOutgoingFriendReqs(req, res) {
 
     res.status(200).json(outgoingRequests);
   } catch (error) {
-    console.error("Error in getOutgoingFriendReqs controller", error.message);
+    logger.error("Error in getOutgoingFriendReqs controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -239,17 +323,22 @@ export async function searchUsers(req, res) {
       return res.status(200).json([]);
     }
 
-    const regex = new RegExp(query.trim(), "i");
+    const regex = new RegExp(escapeRegex(query.trim()), "i");
 
-    const users = await User.find({
+    const queryFilter = {
       _id: { $ne: myId },
       isOnboarded: true,
-      fullName: regex,
-    })
+      role: { $nin: ["admin", "owner"] },
+      $or: [
+        { fullName: regex },
+        { email: regex }
+      ]
+    };
+
+    const users = await User.find(queryFilter)
       .select("fullName profilePic bio location createdAt friends lastSeen")
       .limit(20);
 
-    const onlineUsers = getOnlineUsers();
     const friendIds = new Set((req.user.friends || []).map((id) => id.toString()));
 
     const results = users.map((u) => ({
@@ -260,14 +349,14 @@ export async function searchUsers(req, res) {
       location: u.location || "",
       createdAt: u.createdAt,
       friendsCount: u.friends?.length || 0,
-      isOnline: onlineUsers.has(u._id.toString()),
+      isOnline: presenceManager.isOnline(u._id.toString()),
       lastSeen: u.lastSeen,
       isFriend: friendIds.has(u._id.toString()),
     }));
 
     res.status(200).json(results);
   } catch (error) {
-    console.error("Error in searchUsers controller", error.message);
+    logger.error("Error in searchUsers controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -277,7 +366,7 @@ export async function getBlockedUsers(req, res) {
     const user = await User.findById(req.user.id).populate("blockedUsers", "fullName profilePic");
     res.status(200).json(user.blockedUsers || []);
   } catch (error) {
-    console.error("Error in getBlockedUsers controller:", error.message);
+    logger.error("Error in getBlockedUsers controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -311,13 +400,13 @@ export async function blockUser(req, res) {
       try {
         await streamClient.blockUser(targetId, { user_id: myId });
       } catch (err) {
-        console.error("Stream block user error:", err);
+        logger.error("Stream block user error:", err);
       }
     }
 
     res.status(200).json({ message: "User blocked successfully" });
   } catch (error) {
-    console.error("Error in blockUser controller:", error.message);
+    logger.error("Error in blockUser controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -336,35 +425,66 @@ export async function unblockUser(req, res) {
       try {
         await streamClient.unblockUser(targetId, { user_id: myId });
       } catch (err) {
-        console.error("Stream unblock user error:", err);
+        logger.error("Stream unblock user error:", err);
       }
     }
 
     res.status(200).json({ message: "User unblocked successfully" });
   } catch (error) {
-    console.error("Error in unblockUser controller:", error.message);
+    logger.error("Error in unblockUser controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
 export async function updateSettings(req, res) {
   try {
-    const userId = req.user.id;
-    const { chatWallpaper, privacySettings } = req.body;
+    const userId = req.user._id;
+    const { chatWallpaper, privacySettings, appSettings } = req.body;
 
-    const updateData = {};
-    if (chatWallpaper !== undefined) updateData.chatWallpaper = chatWallpaper;
-    if (privacySettings !== undefined) updateData.privacySettings = privacySettings;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    );
+    if (chatWallpaper !== undefined) {
+      if (chatWallpaper && chatWallpaper.startsWith("data:")) {
+        const validation = validateBase64Upload(chatWallpaper, "image");
+        if (!validation.ok) {
+          return res.status(400).json({ message: validation.error });
+        }
+        const uploadRoot = path.join(__dirname, "../../uploads");
+        const filename = secureFilename(validation.ext);
+        const filepath = safeUploadPath(uploadRoot, filename);
+
+        if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot, { recursive: true });
+
+        fs.writeFileSync(filepath, validation.buffer);
+        const host = req.protocol + "://" + req.get("host");
+        user.chatWallpaper = `${host}/uploads/${filename}`;
+      } else {
+        user.chatWallpaper = chatWallpaper ? sanitizeUrl(chatWallpaper) : chatWallpaper;
+      }
+    }
+
+    if (privacySettings !== undefined) {
+      user.privacySettings = { ...user.privacySettings?.toObject?.() ?? user.privacySettings, ...privacySettings };
+    }
+    if (appSettings !== undefined) {
+      const current = user.appSettings?.toObject?.() ?? user.appSettings ?? {};
+      user.appSettings = {
+        general: { ...current.general, ...appSettings.general },
+        notifications: { ...current.notifications, ...appSettings.notifications },
+        media: { ...current.media, ...appSettings.media },
+      };
+      user.markModified("appSettings");
+    }
+
+    await user.save();
+    const updatedUser = await User.findById(userId).select("-password");
 
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {
-    console.error("Error in updateSettings controller:", error.message);
+    logger.error("Error in updateSettings controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

@@ -349,18 +349,34 @@ const UsersView = () => {
                           <h3 className="text-xl sm:text-2xl font-black tracking-tight">{viewingUser.fullName}</h3>
                           {viewingUser.isVerified && <ShieldCheckIcon className="size-5 text-info" />}
                        </div>
-                       <p className="text-xs sm:text-sm font-medium opacity-50 flex items-center gap-1.5">
-                          {viewingUser.email}
-                          <button 
-                            className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100" 
-                            onClick={() => {
-                               navigator.clipboard.writeText(viewingUser.email);
-                               toast.success("Email copied");
-                            }}
-                          >
-                             <CopyIcon className="size-3" />
-                          </button>
-                       </p>
+                        <div className="flex flex-col gap-1">
+                           <p className="text-xs sm:text-sm font-medium opacity-50 flex items-center gap-1.5">
+                              @{viewingUser.username}
+                              <button 
+                                className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100" 
+                                onClick={() => {
+                                   navigator.clipboard.writeText(viewingUser.username);
+                                   toast.success("Username copied");
+                                }}
+                              >
+                                 <CopyIcon className="size-3" />
+                              </button>
+                           </p>
+                           {viewingUser.email && (
+                              <p className="text-xs sm:text-sm font-medium opacity-50 flex items-center gap-1.5">
+                                 {viewingUser.email}
+                                 <button 
+                                   className="btn btn-ghost btn-xs btn-circle opacity-40 hover:opacity-100" 
+                                   onClick={() => {
+                                      navigator.clipboard.writeText(viewingUser.email);
+                                      toast.success("Email copied");
+                                   }}
+                                 >
+                                    <CopyIcon className="size-3" />
+                                 </button>
+                              </p>
+                           )}
+                        </div>
                     </div>
                  </div>
               </div>

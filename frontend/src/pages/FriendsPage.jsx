@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { WifiIcon, WifiOffIcon, UsersIcon } from "lucide-react";
 
@@ -6,72 +6,45 @@ import { getUserFriends } from "../lib/api";
 import FriendCard from "../components/FriendCard";
 import useAuthUser from "../hooks/useAuthUser.js";
 import useSocket from "../hooks/useSocket.js";
+import { useOnlineRoster, isUserOnline, isRosterReady, getOnlineUserIds } from "../hooks/useSocket.js";
 
 const FriendsPage = () => {
-  const [filterStatus, setFilterStatus] = useState("online");
-  const queryClient = useQueryClient();
   const { authUser } = useAuthUser();
-  const { socket, isConnected, emit } = useSocket();
+  const { isConnected, emit } = useSocket();
+  const [filterStatus, setFilterStatus] = useState("online");
 
-  const { data: friends = [], isLoading: loadingFriends } = useQuery({
+  useOnlineRoster();
+
+  const { data: apiFriends = [], isLoading: loadingFriends } = useQuery({
     queryKey: ["friends"],
     queryFn: getUserFriends,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
   });
 
-  // ── Emit "user-online" and refetch friends when socket connects ───────────
-  // Refetch ensures we get the up-to-date isOnline values from the live
-  // onlineUsers Map (the API now cross-references it).
+  const rosterAvailable = isRosterReady();
+  const friends = apiFriends.map((f) => ({
+    ...f,
+    isOnline: rosterAvailable ? isUserOnline(f._id) : f.isOnline,
+  }));
+
   useEffect(() => {
-    if (isConnected && authUser?._id) {
-      emit("user-online", authUser._id);
-      // Invalidate so the query re-runs and picks up accurate isOnline from API
-      queryClient.invalidateQueries({ queryKey: ["friends"] });
-    }
-  }, [isConnected, authUser?._id, emit, queryClient]);
+    if (!isConnected || !authUser?._id) return;
 
-  // ── Handle full online-users roster sent by server on connect ─────────────
-  // Fixes the race condition: "User A was already online when I loaded the page."
-  useEffect(() => {
-    if (!socket) return;
+    const timers = [
+      setTimeout(() => emit("request-online-roster"), 1000),
+      setTimeout(() => emit("request-online-roster"), 3000),
+      setTimeout(() => emit("request-online-roster"), 6000),
+      setTimeout(() => emit("request-online-roster"), 10000),
+    ];
 
-    const handleOnlineUsersList = (onlineUserIds) => {
-      // onlineUserIds is string[] of every currently-online userId
-      const onlineSet = new Set(onlineUserIds);
-      queryClient.setQueryData(["friends"], (oldFriends = []) =>
-        oldFriends.map((f) => ({
-          ...f,
-          isOnline: onlineSet.has(f._id?.toString()),
-        }))
-      );
-    };
+    return () => timers.forEach(clearTimeout);
+  }, [isConnected, authUser?._id, emit]);
 
-    socket.on("online-users-list", handleOnlineUsersList);
-    return () => socket.off("online-users-list", handleOnlineUsersList);
-  }, [socket, queryClient]);
-
-  // ── Real-time friend connect / disconnect ──────────────────────────────────
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleFriendStatusChange = ({ userId, isOnline }) => {
-      queryClient.setQueryData(["friends"], (oldFriends = []) =>
-        oldFriends.map((f) =>
-          f._id === userId || f._id?.toString() === userId
-            ? { ...f, isOnline }
-            : f
-        )
-      );
-    };
-
-    socket.on("friendStatusChange", handleFriendStatusChange);
-    return () => socket.off("friendStatusChange", handleFriendStatusChange);
-  }, [socket, queryClient]);
-
-  // ── Derived counts ─────────────────────────────────────────────────────────
   const onlineCount = friends.filter((f) => f.isOnline).length;
   const offlineCount = friends.filter((f) => !f.isOnline).length;
 
-  // ── Filter friends by active tab ───────────────────────────────────────────
   const filteredFriends = friends.filter((friend) =>
     filterStatus === "online" ? friend.isOnline : !friend.isOnline
   );
@@ -79,16 +52,31 @@ const FriendsPage = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="container mx-auto space-y-8">
-
-        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Friends</h1>
-          <span className="text-sm text-base-content/50">{friends.length} total</span>
+          <div className="flex gap-4 items-center">
+            {import.meta.env.DEV && (
+              <button 
+                className="btn btn-xs btn-outline"
+                onClick={() => {
+                  console.log("--- DEBUG INFO ---");
+                  console.log("Roster Ready:", isRosterReady());
+                  console.log("Global Roster IDs:", Array.from(getOnlineUserIds()));
+                  console.log("API Friends:", apiFriends.map(f => ({ id: f._id, name: f.fullName, apiIsOnline: f.isOnline })));
+                  console.log("Merged Friends:", friends.map(f => ({ id: f._id, name: f.fullName, mergedIsOnline: f.isOnline })));
+                  console.log("isConnected:", isConnected);
+                }}
+              >
+                Debug Roster
+              </button>
+            )}
+            <span className="text-sm text-base-content/50">{friends.length} total</span>
+          </div>
         </div>
 
-        {/* ── Online / Offline Toggle ──────────────────────────────────────── */}
         <div className="flex items-center gap-3">
           <button
+            type="button"
             className={`btn btn-sm flex items-center gap-2 transition-all ${
               filterStatus === "online" ? "btn-primary" : "btn-outline"
             }`}
@@ -106,6 +94,7 @@ const FriendsPage = () => {
           </button>
 
           <button
+            type="button"
             className={`btn btn-sm flex items-center gap-2 transition-all ${
               filterStatus === "offline" ? "btn-primary" : "btn-outline"
             }`}
@@ -123,7 +112,6 @@ const FriendsPage = () => {
           </button>
         </div>
 
-        {/* ── Friends List ─────────────────────────────────────────────────── */}
         {loadingFriends ? (
           <div className="flex justify-center py-12">
             <span className="loading loading-spinner loading-lg" />

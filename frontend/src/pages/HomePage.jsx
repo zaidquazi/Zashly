@@ -18,6 +18,7 @@ import RecentChats from "../components/RecentChats";
 
 import FriendCard from "../components/FriendCard";
 import NoFriendsFound from "../components/NoFriendsFound";
+import useAuthUser from "../hooks/useAuthUser";
 
 const HomePage = () => {
   const queryClient = useQueryClient();
@@ -58,19 +59,19 @@ const HomePage = () => {
     }
   }, [outgoingFriendReqs]);
 
-  // Define filteredFriends variable to fix the reference error
+  const { authUser } = useAuthUser();
+
   const filteredFriends = friends;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <main className="p-4 sm:p-6 lg:p-8" aria-label="Home dashboard">
       <div className="container mx-auto space-y-10">
-        {/* Moments */}
         <div className="space-y-8">
-          <Moments />
+          {authUser?.role !== "admin" && <Moments />}
           <RecentChats />
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

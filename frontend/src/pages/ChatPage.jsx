@@ -3,10 +3,8 @@ import { useParams } from "react-router";
 import useAuthUser from "../hooks/useAuthUser";
 import { useQuery } from "@tanstack/react-query";
 import { getStreamToken } from "../lib/api";
-import useStartCall from "../hooks/useStartCall";
-
+import { connectStreamUser } from "../lib/streamClient";
 import ChatLoader from "../components/ChatLoader";
-import CallButton from "../components/CallButton";
 import CustomMessageRenderer from "../components/CustomMessageRenderer";
 import CustomMessageInput from "../components/CustomMessageInput";
 import UserProfileModal from "../components/UserProfileModal";
@@ -23,25 +21,34 @@ import {
 } from "stream-chat-react";
 import { StreamChat } from "stream-chat";
 import toast from "react-hot-toast";
-import io from "socket.io-client";
+import useSocket from "../hooks/useSocket";
 import ProfileAvatar from "../components/ProfileAvatar";
-import { Phone, Video, Trash2Icon } from "lucide-react";
+import { Trash2Icon, Moon, Sun } from "lucide-react";
+import CallButtons from "../features/calls/components/CallButtons";
+import "../chat-redesign.css";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5002";
 
 const ChatPage = () => {
   const { id: targetUserId } = useParams();
   const [chatClient, setChatClient] = useState(null);
   const [channel, setChannel] = useState(null);
+  const [chatTheme, setChatTheme] = useState(() => {
+    return localStorage.getItem("stream-chat-theme") || "str-chat__theme-dark";
+  });
   const [loading, setLoading] = useState(true);
   const [targetUser, setTargetUser] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
-  const socketRef = useRef(null);
 
   const { authUser } = useAuthUser();
-  const { startCall } = useStartCall();
+  const { socket } = useSocket();
+
+  const toggleChatTheme = () => {
+    const newTheme = chatTheme === "str-chat__theme-dark" ? "str-chat__theme-light" : "str-chat__theme-dark";
+    setChatTheme(newTheme);
+    localStorage.setItem("stream-chat-theme", newTheme);
+  };
 
   const { data: tokenData } = useQuery({
     queryKey: ["streamToken"],
@@ -51,6 +58,7 @@ const ChatPage = () => {
 
   const receiveSoundRef = useRef(null);
   const sendSoundRef = useRef(null);
+
 
 
   const CustomHeader = () => {
@@ -63,58 +71,67 @@ const ChatPage = () => {
     const isOnline = displayUser.online;
 
     return (
-      <div className="chat-header-3d">
+      <div className="premium-chat-header">
         <div 
-          className="chat-header-user"
+          className="premium-chat-header-info"
           onClick={() => setShowProfile(true)}
         >
-          <div className="chat-header-avatar-wrap">
+          <div className="relative">
             <ProfileAvatar 
               src={displayUser.image || displayUser.profilePic} 
               name={displayUser.name || displayUser.fullName || "User"} 
-              size="w-10 h-10" 
+              size="w-11 h-11" 
               textSize="text-base" 
             />
             {isOnline && (
-              <span className="chat-status-dot chat-status-online" />
+              <span className="absolute bottom-0 right-0 premium-online-dot" />
             )}
           </div>
-          <div className="chat-header-info">
-            <p className="chat-header-name">
+          <div className="premium-chat-header-text">
+            <p className="premium-chat-header-name">
               {displayUser.name || displayUser.fullName || "User"}
             </p>
-            <p className="chat-header-status">
+            <p className="premium-chat-header-status">
               {isOnline ? "Online" : "Offline"}
             </p>
           </div>
         </div>
 
-        <div className="chat-header-actions">
-          <button
-            className="chat-header-action-btn"
-            onClick={handleVoiceCall}
-            title="Voice Call"
-          >
-            <Phone className="size-4 sm:size-5 text-success" />
-          </button>
+        <div className="premium-chat-header-actions">
+          <CallButtons
+            targetId={displayUser.id || targetUserId}
+            targetName={displayUser.name || displayUser.fullName}
+            targetPic={displayUser.image || displayUser.profilePic}
+          />
 
           <button
-            className="chat-header-action-btn"
-            onClick={handleVideoCall}
-            title="Video Call"
+            type="button"
+            className="premium-icon-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleChatTheme();
+            }}
+            title="Toggle Theme"
           >
-            <Video className="size-4 sm:size-5 text-primary" />
+            {chatTheme === "str-chat__theme-dark" ? (
+              <Sun className="size-5 text-yellow-500" />
+            ) : (
+              <Moon className="size-5" />
+            )}
           </button>
 
+
+
           <button
-            className="chat-header-action-btn chat-header-action-danger"
+            type="button"
+            className="premium-icon-btn danger"
             onClick={(e) => {
               e.stopPropagation();
               setShowClearModal(true);
             }}
             title="Clear Chat"
           >
-            <Trash2Icon className="size-4 sm:size-5" />
+            <Trash2Icon className="size-5" />
           </button>
         </div>
       </div>
@@ -132,45 +149,14 @@ const ChatPage = () => {
     }
   };
 
-  // Connect socket for poll real-time updates
-  useEffect(() => {
-    if (!authUser) return;
-    const socket = io(SOCKET_URL, { withCredentials: true });
-    socketRef.current = socket;
-    return () => {
-      socket.disconnect();
-    };
-  }, [authUser]);
-
   useEffect(() => {
     const initChat = async () => {
       if (!tokenData?.token || !authUser) return;
 
       try {
-        const client = StreamChat.getInstance(STREAM_API_KEY);
         const desiredId = String(authUser._id);
-        // Only pass image if it's a URL, not a base64 string (base64 exceeds Stream's 5KB user data limit)
-        const userImage = authUser.profilePic && !authUser.profilePic.startsWith('data:') ? authUser.profilePic : '';
-        if (!client.userID) {
-          await client.connectUser(
-            {
-              id: desiredId,
-              name: authUser.fullName,
-              image: userImage,
-            },
-            tokenData.token
-          );
-        } else if (client.userID !== desiredId) {
-          await client.disconnectUser();
-          await client.connectUser(
-            {
-              id: desiredId,
-              name: authUser.fullName,
-              image: userImage,
-            },
-            tokenData.token
-          );
-        }
+        const client = await connectStreamUser(authUser, tokenData.token);
+        if (!client) return;
 
         const channelId = [authUser._id, targetUserId].sort().join("-");
 
@@ -206,32 +192,12 @@ const ChatPage = () => {
     initChat();
   }, [tokenData, authUser, targetUserId]);
 
-  const handleVoiceCall = () => {
-    startCall({
-      callType: "voice",
-      type: "one-on-one",
-      targetId: targetUserId,
-      targetName: targetUser?.name || "User",
-      targetPic: targetUser?.image || "",
-    });
-  };
-
-  const handleVideoCall = () => {
-    startCall({
-      callType: "video",
-      type: "one-on-one",
-      targetId: targetUserId,
-      targetName: targetUser?.name || "User",
-      targetPic: targetUser?.image || "",
-    });
-  };
-
   // Custom message component wrapper
   const MessageWithExtras = useCallback(
     (props) => (
       <CustomMessageRenderer
         {...props}
-        socket={socketRef.current}
+        socket={socket}
         isGroupChat={false}
       />
     ),
@@ -254,29 +220,51 @@ const ChatPage = () => {
 
   return (
     <div className="h-full relative overflow-hidden">
-      <audio ref={receiveSoundRef} src="/message-receive.mp3" preload="auto" />
-      <audio ref={sendSoundRef} src="/message-send.mp3" preload="auto" />
+      <audio ref={receiveSoundRef} src="/message-receive.wav" preload="auto" />
+      <audio ref={sendSoundRef} src="/message-send.wav" preload="auto" />
 
-      <Chat client={chatClient}>
+      <Chat client={chatClient} theme={chatTheme}>
         <Channel channel={channel}>
           <ChatEffectsWrapper showBackground={showThreeBackground}>
             {({ onSendParticles }) => (
               <div 
-                className={`w-full h-full relative transition-all duration-500 ${authUser?.chatWallpaper ? 'bg-transparent' : 'chat-3d-bg'}`}
+                className={`premium-chat-layout transition-all duration-500 ${
+                  authUser?.chatWallpaper 
+                    ? 'bg-transparent' 
+                    : chatTheme === 'str-chat__theme-light'
+                      ? 'bg-slate-50'
+                      : 'bg-slate-900'
+                }`}
                 style={chatWallpaperStyle}
               >
                 <Window>
                   <CustomHeader />
                   <MessageList Message={MessageWithExtras} />
-                  <MessageInput focus Input={(props) => <CustomMessageInput {...props} isGroupChat={false} onSendParticles={onSendParticles} />} />
+                  <MessageInput
+                    focus
+                    additionalTextareaProps={{
+                      onKeyDown: (e) => {
+                        const enterToSend =
+                          authUser?.appSettings?.general?.enterToSend ?? true;
+                        if (!enterToSend && e.key === "Enter" && !e.shiftKey) {
+                          e.stopPropagation();
+                        }
+                      },
+                    }}
+                    Input={(props) => (
+                      <CustomMessageInput
+                        {...props}
+                        isGroupChat={false}
+                        onSendParticles={onSendParticles}
+                      />
+                    )}
+                  />
                 </Window>
                 
                 {showProfile && (
                   <UserProfileModal 
                     user={targetUser} 
                     onClose={() => setShowProfile(false)}
-                    onStartVoiceCall={handleVoiceCall}
-                    onStartVideoCall={handleVideoCall}
                   />
                 )}
 

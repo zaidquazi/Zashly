@@ -3,28 +3,27 @@ import ProfileAvatar from "./ProfileAvatar";
 import useAuthUser from "../hooks/useAuthUser";
 import {
   BellIcon,
-  ShipWheelIcon,
+  LoaderPinwheel,
   SearchIcon,
   XIcon,
-  UserIcon,
-  SettingsIcon,
-  LogOutIcon,
-  ChevronDownIcon,
+  UserCheckIcon,
+  HeartIcon,
+  MessageCircleIcon,
+  ClockIcon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useState, useEffect, useRef } from "react";
-import useLogout from "../hooks/useLogout";
-import ThemeSelector from "./ThemeSelector";
 import SearchUserProfile from "./SearchUserProfile";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 
 // 🧩 Import the search API
-import { searchUsers, sendFriendRequest } from "../lib/api";
+import { searchUsers, sendFriendRequest, getFriendRequests, getNotifications } from "../lib/api";
 
 const Navbar = ({ showSidebar }) => {
   const { authUser } = useAuthUser();
   const location = useLocation();
   const navigate = useNavigate();
-  const dropdownRef = useRef(null);
   const notifyRef = useRef(null);
 
   const isChatPage =
@@ -38,18 +37,29 @@ const Navbar = ({ showSidebar }) => {
   const [requestedIds, setRequestedIds] = useState(new Set());
   const [selectedProfile, setSelectedProfile] = useState(null);
 
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifyOpen, setIsNotifyOpen] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const { logoutMutation } = useLogout();
+  const { data: friendRequests } = useQuery({
+    queryKey: ["friendRequests"],
+    queryFn: getFriendRequests,
+    refetchInterval: 10000, 
+    enabled: !!authUser,
+  });
+
+  const { data: notifications } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: getNotifications,
+    refetchInterval: 15000,
+    enabled: !!authUser,
+  });
+
+  const incomingRequests = friendRequests?.incomingReqs || [];
+  const unreadNotifications = (notifications || []).filter(n => !n.isRead);
+  const totalUnread = incomingRequests.length + unreadNotifications.length;
 
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsProfileOpen(false);
-      }
       if (notifyRef.current && !notifyRef.current.contains(event.target)) {
         setIsNotifyOpen(false);
       }
@@ -57,17 +67,6 @@ const Navbar = ({ showSidebar }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleLogout = () => {
-    setIsProfileOpen(false);
-    setShowLogoutConfirm(true);
-  };
-
-  const confirmLogout = () => {
-    logoutMutation();
-    setShowLogoutConfirm(false);
-    toast.success("Logged out successfully!");
-  };
 
   // 🔍 Search users (friends + new)
   useEffect(() => {
@@ -128,16 +127,22 @@ const Navbar = ({ showSidebar }) => {
   return (
     <>
       <nav className="bg-base-200 border-b border-base-300 sticky top-0 z-40 h-16 flex items-center">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between w-full">
             {/* LOGO */}
-            <div className={`flex items-center ${showSidebar ? "lg:hidden" : ""}`}>
-              <Link to="/" className="flex items-center gap-2.5 transition-all hover:scale-105 active:scale-95">
-                <ShipWheelIcon className="size-8 sm:size-9 text-primary animate-spin-slow" />
+            <div className={`flex items-center gap-4 ${showSidebar ? "lg:hidden" : ""}`}>
+              <Link to="/app" className="flex items-center gap-2.5 transition-all hover:scale-105 active:scale-95">
+                <LoaderPinwheel className="size-8 sm:size-9 text-primary animate-spin-slow" />
                 <span className="text-2xl sm:text-3xl font-bold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-wider drop-shadow-sm">
                   Zashly
                 </span>
               </Link>
+              
+              {!showSidebar && location.pathname.startsWith('/admin') && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20 cursor-default">
+                  <span className="text-xs font-bold text-primary tracking-wider uppercase">Admin Console</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 sm:gap-4 ml-auto relative">
@@ -153,41 +158,45 @@ const Navbar = ({ showSidebar }) => {
                 />
 
                 {/* 🧭 Search Results Dropdown */}
-                {searchTerm && searchResults.length > 0 && (
-                  <div className="absolute top-9 left-0 w-full bg-base-200 border border-base-300 rounded-lg shadow-md z-50 overflow-hidden">
-                    {searchResults.map((user) => (
-                      <div
-                        key={user._id}
-                        className="flex items-center gap-3 p-2 w-full hover:bg-base-300 cursor-pointer transition-colors"
-                        onClick={() => handleOpenProfile(user)}
-                      >
-                        <ProfileAvatar src={user.profilePic} name={user.fullName} size="w-8 h-8" textSize="text-sm" />
-                        <span className="text-sm flex-1 truncate">{user.fullName}</span>
-                        {user.isFriend ? (
-                          <button
-                            className="btn btn-primary btn-xs"
-                            onClick={(e) => { e.stopPropagation(); handleSelectUser(user); }}
-                          >
-                            Message
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-secondary btn-xs"
-                            disabled={requestedIds.has(user._id)}
-                            onClick={(e) => { e.stopPropagation(); handleAddFriend(user._id); }}
-                          >
-                            {requestedIds.has(user._id) ? "Requested" : "Add Friend"}
-                          </button>
-                        )}
+                {searchTerm && (
+                  <div className="absolute top-9 left-0 w-full bg-base-200 border border-base-300 rounded-lg shadow-md z-50 overflow-hidden max-h-60 overflow-y-auto">
+                    {isSearching ? (
+                      <div className="p-3 text-center text-sm text-base-content/50 flex items-center justify-center gap-2">
+                        <span className="loading loading-spinner loading-xs text-primary" />
+                        <span>Searching...</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* 🕓 Loading Indicator */}
-                {isSearching && (
-                  <div className="absolute top-2 right-3">
-                    <span className="loading loading-spinner loading-sm" />
+                    ) : searchResults.length > 0 ? (
+                      searchResults.map((user) => (
+                        <div
+                          key={user._id}
+                          className="flex items-center gap-3 p-2 w-full hover:bg-base-300 cursor-pointer transition-colors"
+                          onClick={() => handleOpenProfile(user)}
+                        >
+                          <ProfileAvatar src={user.profilePic} name={user.fullName} size="w-8 h-8" textSize="text-sm" />
+                          <span className="text-sm flex-1 truncate">{user.fullName}</span>
+                          {user.isFriend ? (
+                            <button
+                              className="btn btn-primary btn-xs"
+                              onClick={(e) => { e.stopPropagation(); handleSelectUser(user); }}
+                            >
+                              Message
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-secondary btn-xs"
+                              disabled={requestedIds.has(user._id)}
+                              onClick={(e) => { e.stopPropagation(); handleAddFriend(user._id); }}
+                            >
+                              {requestedIds.has(user._id) ? "Requested" : "Add Friend"}
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-sm text-base-content/50">
+                        No users found
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -291,8 +300,12 @@ const Navbar = ({ showSidebar }) => {
                   className={`btn btn-ghost btn-circle ${isNotifyOpen ? 'bg-base-300' : ''}`}
                   onClick={() => setIsNotifyOpen(!isNotifyOpen)}
                 >
-                  <BellIcon className="h-6 w-6 text-base-content opacity-70" />
-                  {/* Badge can go here if needed */}
+                  <div className="indicator">
+                    <BellIcon className="h-6 w-6 text-base-content opacity-70" />
+                    {totalUnread > 0 && (
+                      <span className="badge badge-sm badge-primary indicator-item">{totalUnread}</span>
+                    )}
+                  </div>
                 </button>
 
                 {isNotifyOpen && (
@@ -301,162 +314,85 @@ const Navbar = ({ showSidebar }) => {
                       <h3 className="font-bold text-lg">Notifications</h3>
                       <Link to="/notifications" onClick={() => setIsNotifyOpen(false)} className="text-xs text-primary font-medium hover:underline">View all</Link>
                     </div>
-                    <div className="max-h-[60vh] md:max-h-96 overflow-y-auto p-4 text-center">
-                      <div className="py-12 flex flex-col items-center gap-3">
-                        <div className="w-16 h-16 bg-base-300 rounded-full flex items-center justify-center opacity-20">
-                          <BellIcon size={32} />
+                    <div className="max-h-[60vh] md:max-h-96 overflow-y-auto p-2">
+                      {totalUnread === 0 && (!notifications || notifications.length === 0) ? (
+                        <div className="py-12 flex flex-col items-center text-center gap-3">
+                          <div className="w-16 h-16 bg-base-300 rounded-full flex items-center justify-center opacity-20">
+                            <BellIcon size={32} />
+                          </div>
+                          <p className="text-sm text-base-content/50">No new notifications</p>
                         </div>
-                        <p className="text-sm text-base-content/50">No new notifications</p>
-                      </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {/* Friend Requests */}
+                          {incomingRequests.slice(0, 3).map((req) => (
+                            <Link
+                              key={req._id}
+                              to="/notifications"
+                              onClick={() => setIsNotifyOpen(false)}
+                              className="flex items-start gap-3 p-2 hover:bg-base-300 rounded-xl transition-colors"
+                            >
+                              <ProfileAvatar src={req.sender?.profilePic} name={req.sender?.fullName} size="w-10 h-10" />
+                              <div className="flex-1">
+                                <p className="text-sm"><span className="font-semibold">{req.sender?.fullName}</span> sent you a friend request</p>
+                                <p className="text-xs text-primary mt-0.5 flex items-center gap-1">
+                                  <UserCheckIcon size={12} /> Pending Request
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                          
+                          {/* Other Notifications */}
+                          {(notifications || []).slice(0, 5).map((n) => (
+                            <Link
+                              key={n._id}
+                              to="/notifications"
+                              onClick={() => setIsNotifyOpen(false)}
+                              className={`flex items-start gap-3 p-2 hover:bg-base-300 rounded-xl transition-colors ${!n.isRead ? 'bg-base-300/50' : ''}`}
+                            >
+                              <div className="relative">
+                                <ProfileAvatar src={n.sender?.profilePic} name={n.sender?.fullName} size="w-10 h-10" />
+                                <div className={`absolute -bottom-1 -right-1 size-5 rounded-full flex items-center justify-center border-2 border-base-200 ${n.type === 'like' ? 'bg-error text-white' : 'bg-info text-white'}`}>
+                                  {n.type === 'like' ? <HeartIcon size={10} fill="currentColor" /> : <MessageCircleIcon size={10} />}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm">
+                                  <span className="font-semibold">{n.sender?.fullName}</span>{' '}
+                                  {n.type === 'like' ? 'liked your spark' : n.type === 'comment' ? `commented: "${n.content}"` : 'interacted with you'}
+                                </p>
+                                <p className="text-[10px] opacity-50 mt-0.5 flex items-center gap-1">
+                                  <ClockIcon size={10} />
+                                  {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 👤 Avatar Dropdown - Premium WhatsApp Style */}
-              <div className="relative" ref={dropdownRef}>
-                <div 
-                  className={`flex items-center gap-1.5 cursor-pointer p-1 rounded-full transition-all duration-300 ${isProfileOpen ? 'bg-base-300 ring-2 ring-primary/20' : 'hover:bg-base-300'}`}
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                >
-                  <ProfileAvatar src={authUser?.profilePic} name={authUser?.fullName} size="w-10 h-10" textSize="text-base" className="shadow-sm" />
-                  <ChevronDownIcon className={`size-4 opacity-50 transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />
-                </div>
-
-                {isProfileOpen && (
-                  <div className="absolute right-0 mt-3 w-72 bg-base-100/95 backdrop-blur-xl border border-base-content/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
-                    {/* User Profile Header */}
-                    <div className="p-5 border-b border-base-content/5 bg-base-200/50">
-                      <div className="flex items-center gap-3">
-                        <ProfileAvatar src={authUser?.profilePic} name={authUser?.fullName} size="w-12 h-12" textSize="text-xl" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-base truncate">{authUser?.fullName}</p>
-                          <p className="text-xs text-base-content/50 truncate font-medium">{authUser?.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Menu Items */}
-                    <div className="p-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                      <Link
-                        to="/edit-profile"
-                        className="flex items-center gap-4 px-4 py-3 hover:bg-base-content/5 rounded-xl transition-all duration-200 group"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <div className="size-9 bg-primary/10 text-primary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <UserIcon className="size-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold">Edit Profile</p>
-                          <p className="text-[10px] text-base-content/40 font-medium">Name, bio, profile photo</p>
-                        </div>
-                      </Link>
-                      
-                      <Link
-                        to="/settings"
-                        className="flex items-center gap-4 px-4 py-3 hover:bg-base-content/5 rounded-xl transition-all duration-200 group"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <div className="size-9 bg-secondary/10 text-secondary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <SettingsIcon className="size-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold">Settings</p>
-                          <p className="text-[10px] text-base-content/40 font-medium">App preferences & general</p>
-                        </div>
-                      </Link>
-
-                      <div className="px-1 py-1">
-                        <div className="px-3 mb-1">
-                          <ThemeSelector variant="menuItem" />
-                        </div>
-                      </div>
-
-                      <div className="divider opacity-30 my-1 px-4"></div>
-
-                      <div className="space-y-0.5">
-                        <Link
-                          to="/settings"
-                          className="w-full flex items-center gap-4 px-4 py-3 hover:bg-base-content/5 rounded-xl transition-all duration-200 text-left group opacity-70 hover:opacity-100"
-                          onClick={() => setIsProfileOpen(false)}
-                        >
-                          <div className="size-9 bg-info/10 text-info rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <ShipWheelIcon className="size-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold">Account</p>
-                            <p className="text-[10px] text-base-content/40 font-medium">Security, account info</p>
-                          </div>
-                        </Link>
-
-                        <Link
-                          to="/settings"
-                          className="w-full flex items-center gap-4 px-4 py-3 hover:bg-base-content/5 rounded-xl transition-all duration-200 text-left group opacity-70 hover:opacity-100"
-                          onClick={() => setIsProfileOpen(false)}
-                        >
-                          <div className="size-9 bg-success/10 text-success rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <BellIcon className="size-5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold">Notifications</p>
-                            <p className="text-[10px] text-base-content/40 font-medium">Messages, groups, sounds</p>
-                          </div>
-                        </Link>
-                      </div>
-
-                      <div className="divider opacity-30 my-1 px-4"></div>
-
-                      <button
-                        className="flex items-center gap-4 px-4 py-3 w-full hover:bg-error/10 text-error rounded-xl transition-all duration-200 text-left group"
-                        onClick={handleLogout}
-                      >
-                        <div className="size-9 bg-error/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <LogOutIcon className="size-5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-bold">Log Out</p>
-                          <p className="text-[10px] text-error/50 font-medium">Sign out from Zashly</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* 👤 Profile Avatar Link */}
+              <Link
+                to="/settings"
+                className="flex items-center p-1 rounded-full hover:bg-base-300 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                title="Settings"
+              >
+                <ProfileAvatar
+                  src={authUser?.profilePic}
+                  name={authUser?.fullName}
+                  size="w-10 h-10"
+                  textSize="text-base"
+                  className="shadow-sm"
+                />
+              </Link>
             </div>
           </div>
         </div>
       </nav>
-
-      {/* 🧠 Logout Confirmation Popup */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-          <div className="bg-white dark:bg-base-200 rounded-2xl shadow-2xl p-6 w-80 text-center relative z-[101] animate-in fade-in zoom-in duration-200 border border-base-300">
-            <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-4">
-              <LogOutIcon className="size-8" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Log Out?</h3>
-            <p className="text-sm text-base-content/60 mb-6">
-              Are you sure you want to log out of your account?
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                className="btn btn-error text-white w-full"
-                onClick={confirmLogout}
-                disabled={logoutMutation?.isPending}
-              >
-                {logoutMutation?.isPending ? "Logging out..." : "Yes, Log Out"}
-              </button>
-              <button
-                className="btn btn-ghost w-full"
-                onClick={() => setShowLogoutConfirm(false)}
-                disabled={logoutMutation?.isPending}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 👤 Instagram-style User Profile Modal */}
       {selectedProfile && (

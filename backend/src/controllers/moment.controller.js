@@ -1,6 +1,19 @@
+import logger from "../monitoring/logger.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import Moment from "../models/Moment.js";
 import User from "../models/User.js";
 import MomentReply from "../models/MomentReply.js";
+import {
+  validateBase64Upload,
+  secureFilename,
+  safeUploadPath,
+} from "../uploads/security/fileValidator.js";
+import { sanitizeText } from "../utils/security/sanitize.util.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const HOURS_24 = 24 * 60 * 60 * 1000;
 
@@ -31,14 +44,14 @@ export async function getMoments(req, res) {
       }))
     );
   } catch (e) {
-    console.error("getMoments error", e);
+    logger.error("getMoments error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
 export async function createMoment(req, res) {
   try {
-    const { mediaUrl, type, durationMs } = req.body;
+    let { mediaUrl, type, durationMs } = req.body;
     if (!mediaUrl || !type) {
       return res.status(400).json({ message: "mediaUrl and type are required" });
     }
@@ -46,8 +59,19 @@ export async function createMoment(req, res) {
       return res.status(400).json({ message: "Invalid type" });
     }
 
-    if (mediaUrl.length > 13000000) {
-      return res.status(413).json({ message: "File is too large to process. Maximum allowed is ~10MB." });
+    if (mediaUrl.startsWith("data:")) {
+      const validation = validateBase64Upload(mediaUrl, type);
+      if (!validation.ok) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const uploadRoot = path.join(__dirname, "../../uploads");
+      const filename = secureFilename(validation.ext);
+      const filepath = safeUploadPath(uploadRoot, filename);
+
+      fs.writeFileSync(filepath, validation.buffer);
+      const host = req.protocol + "://" + req.get("host");
+      mediaUrl = `${host}/uploads/${filename}`;
     }
 
     const moment = await Moment.create({
@@ -72,7 +96,7 @@ export async function createMoment(req, res) {
       viewers: [],
     });
   } catch (e) {
-    console.error("createMoment error", e);
+    logger.error("createMoment error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -84,7 +108,7 @@ export async function markViewed(req, res) {
     await Moment.findByIdAndUpdate(id, { $addToSet: { viewers: userId } });
     res.json({ ok: true });
   } catch (e) {
-    console.error("markViewed error", e);
+    logger.error("markViewed error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -104,7 +128,7 @@ export async function deleteMoment(req, res) {
     await MomentReply.deleteMany({ moment: id });
     res.json({ ok: true });
   } catch (e) {
-    console.error("deleteMoment error", e);
+    logger.error("deleteMoment error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -130,7 +154,7 @@ export async function getReplies(req, res) {
       }))
     );
   } catch (e) {
-    console.error("getReplies error", e);
+    logger.error("getReplies error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -140,7 +164,14 @@ export async function createReply(req, res) {
     const { id } = req.params;
     const { text = "", emoji = "" } = req.body || {};
     if (!text && !emoji) return res.status(400).json({ message: "text or emoji required" });
-    const reply = await MomentReply.create({ moment: id, sender: req.user.id, text, emoji });
+    const safeText = sanitizeText(text, 500);
+    const safeEmoji = sanitizeText(emoji, 16);
+    const reply = await MomentReply.create({
+      moment: id,
+      sender: req.user.id,
+      text: safeText,
+      emoji: safeEmoji,
+    });
     const populated = await reply.populate("sender", "fullName profilePic");
     res.status(201).json({
       id: populated._id,
@@ -154,7 +185,7 @@ export async function createReply(req, res) {
       },
     });
   } catch (e) {
-    console.error("createReply error", e);
+    logger.error("createReply error", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

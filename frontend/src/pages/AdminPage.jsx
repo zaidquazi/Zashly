@@ -12,7 +12,13 @@ import AnalyticsView from "../components/admin/AnalyticsView";
 import BroadcastView from "../components/admin/BroadcastView";
 import AutoModerationView from "../components/admin/AutoModerationView";
 import MediaManagementView from "../components/admin/MediaManagementView";
-import DataComplianceView from "../components/admin/DataComplianceView";
+import AppealsView from "../components/admin/AppealsView";
+import AccountDeletionView from "../components/admin/AccountDeletionView";
+import UsernameManagementView from "../components/admin/UsernameManagementView";
+import VerificationManagementView from "../components/admin/VerificationManagementView";
+import BannedUsersView from "../components/admin/BannedUsersView";
+import DeviceManagementView from "../components/admin/DeviceManagementView";
+import AdminManagementView from "../components/admin/AdminManagementView";
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -21,17 +27,23 @@ const AdminPage = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard": return <DashboardView />;
-      case "broadcasts": return <BroadcastView />;
-      case "automod": return <AutoModerationView />;
       case "users": return <UsersView />;
+      case "usernames": return <UsernameManagementView />;
+      case "verification": return <VerificationManagementView />;
       case "groups": return <GroupsView />;
       case "moderation": return <ModerationView />;
+      case "automod": return <AutoModerationView />;
       case "security": return <SecurityView />;
+      case "appeals": return <AppealsView />;
+      case "account-deletions": return <AccountDeletionView />;
+      case "banned": return <BannedUsersView />;
+      case "devices": return <DeviceManagementView />;
+      case "broadcasts": return <BroadcastView />;
       case "media": return <MediaManagementView />;
-      case "audit": return <AuditLogsView />;
       case "analytics": return <AnalyticsView onTabChange={setActiveTab} />;
-      case "compliance": return <DataComplianceView />;
+      case "audit": return <AuditLogsView />;
       case "settings": return <SystemConfigView />;
+      case "admins": return <AdminManagementView />;
       default: return <DashboardView />;
     }
   };
@@ -42,7 +54,7 @@ const AdminPage = () => {
   };
 
   return (
-    <div className="flex h-screen bg-base-100 overflow-hidden relative">
+    <div className="flex h-full bg-base-100 overflow-hidden relative">
       {/* ── Mobile Header ───────────────────────────────── */}
       <header className="lg:hidden absolute top-0 left-0 right-0 h-16 bg-base-200 border-b border-base-300 flex items-center justify-between px-6 z-40">
         <div className="flex items-center gap-2 text-primary">
@@ -73,7 +85,7 @@ const AdminPage = () => {
         <AdminSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
 
-      {/* ── Main Canvas ─────────────────────────────────── */}
+      {/* ── Main Canvas ────── */}
       <main className="flex-1 overflow-y-auto custom-scrollbar pt-16 lg:pt-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-24">
            {renderContent()}

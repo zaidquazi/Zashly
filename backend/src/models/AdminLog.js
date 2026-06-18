@@ -11,4 +11,6 @@ const logSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+logSchema.index({ createdAt: -1 }, { background: true });
+
 export default mongoose.model("AdminLog", logSchema);

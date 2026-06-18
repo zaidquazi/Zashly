@@ -1,12 +1,12 @@
 import { Link, useLocation } from "react-router";
-import { HomeIcon, UsersIcon, MessageSquareIcon, PhoneIcon } from "lucide-react";
+import { HomeIcon, UsersIcon, MessageSquareIcon,PhoneIcon } from "lucide-react";
 
 const BottomNav = () => {
   const location = useLocation();
   const currentPath = location.pathname;
 
   const navItems = [
-    { icon: HomeIcon, label: "Home", path: "/" },
+    { icon: HomeIcon, label: "Home", path: "/app" },
     { icon: UsersIcon, label: "Friends", path: "/friends" },
     { icon: MessageSquareIcon, label: "Groups", path: "/groups" },
     { icon: PhoneIcon, label: "Calls", path: "/calls" },

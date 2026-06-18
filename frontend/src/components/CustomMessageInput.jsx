@@ -126,28 +126,30 @@ const CustomMessageInputInner = ({ isGroupChat = false, onSendParticles }) => {
       />
 
       {/* Main Input Row: [Poll] [Input Bubble] [Mic] */}
-      <div className="wa-input-container">
+      <div className="premium-input-area items-end" style={{ flexWrap: 'nowrap' }}>
         {/* Poll button — group chats only */}
         {isGroupChat && (
-          <button
-            className="wa-action-btn"
-            onClick={() => setShowPollModal(true)}
-            title="Create Poll"
-            type="button"
-          >
-            <BarChart3 size={22} />
-          </button>
+          <div className="flex items-center justify-center shrink-0" style={{ height: '48px', marginRight: '4px' }}>
+            <button
+              className="premium-input-btn"
+              onClick={() => setShowPollModal(true)}
+              title="Create Poll"
+              type="button"
+            >
+              <BarChart3 size={24} />
+            </button>
+          </div>
         )}
 
         {/* The Input "Bubble" */}
-        <div className="wa-input-bubble" ref={sendBtnRef}>
+        <div className="premium-input-container" ref={sendBtnRef}>
           <MessageInputFlat />
         </div>
 
         {/* WhatsApp-style Mic/Send Button with Ripple */}
-        <div className="wa-mic-wrapper">
+        <div className="relative">
           <button
-            className={`wa-mic-btn ${ripple ? "wa-mic-ripple-active" : ""}`}
+            className={`premium-send-btn-wrapper ${ripple ? "wa-mic-ripple-active" : ""}`}
             onClick={() => !uploadingVoice && setShowRecorder(true)}
             title={uploadingVoice ? "Uploading…" : "Record voice message"}
             type="button"

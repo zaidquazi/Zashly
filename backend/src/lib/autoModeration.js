@@ -1,3 +1,4 @@
+import logger from "../monitoring/logger.js";
 import BannedWord from "../models/BannedWord.js";
 
 // In-memory cache for banned words to avoid DB hits on every message
@@ -13,7 +14,7 @@ async function loadCache() {
     bannedWordsCache = await BannedWord.find({ isActive: true }).lean();
     cacheLoadedAt = now;
   } catch (err) {
-    console.error("Failed to load banned words cache:", err.message);
+    logger.error("Failed to load banned words cache:", err.message);
   }
 }
 

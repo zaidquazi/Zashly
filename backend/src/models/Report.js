@@ -16,4 +16,6 @@ const reportSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+reportSchema.index({ status: 1, createdAt: -1 }, { background: true });
+
 export default mongoose.model("Report", reportSchema);

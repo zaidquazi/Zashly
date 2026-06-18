@@ -5,10 +5,33 @@
   .animate-spin-slow {
     animation: spin 3s linear infinite;
   }
+  .animate-gradient-shift {
+    background-size: 200% auto;
+    animation: gradient-shift 6s ease infinite;
+  }
+  .animate-hue-shift {
+    animation: hue-shift 15s linear infinite;
+  }
 }
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes hue-shift {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
 }
 
 .str-chat__channel {
@@ -1375,53 +1398,73 @@
   gap: 8px;
 }
 
-.poll-option-bar {
-  position: relative;
+.poll-option-row {
+  display: flex;
+  align-items: center;
   width: 100%;
   border: none;
-  border-radius: 10px;
-  padding: 10px 14px;
+  background: transparent;
+  padding: 4px 0;
   text-align: left;
   cursor: pointer;
-  overflow: hidden;
   transition: all 0.2s;
-  font-size: 14px;
+  font-size: 15px;
 }
 
-.poll-bubble-own .poll-option-bar {
-  background: rgba(255, 255, 255, 0.12);
+.poll-option-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 
-.poll-bubble-other .poll-option-bar {
-  background: rgba(0, 0, 0, 0.04);
+.poll-radio-icon {
+  transition: all 0.2s;
 }
 
-.poll-option-clickable:hover {
+.poll-bubble-own .poll-radio-inactive {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.poll-bubble-other .poll-radio-inactive {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.poll-bubble-own .poll-radio-active {
+  color: #ffffff;
+}
+
+.poll-bubble-other .poll-radio-active {
+  color: #006cff;
+}
+
+.poll-option-bar-inner {
+  position: relative;
+  flex: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 8px 12px;
+  background: transparent;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.poll-option-clickable:hover .poll-option-bar-inner {
   transform: scale(1.01);
 }
 
-.poll-bubble-own .poll-option-clickable:hover {
-  background: rgba(255, 255, 255, 0.2);
+.poll-bubble-own .poll-option-clickable:hover .poll-option-bar-inner {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.poll-bubble-other .poll-option-clickable:hover {
-  background: rgba(0, 108, 255, 0.06);
+.poll-bubble-other .poll-option-clickable:hover .poll-option-bar-inner {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .poll-option-disabled {
   cursor: default;
-}
-
-.poll-option-selected {
-  border: 2px solid;
-}
-
-.poll-bubble-own .poll-option-selected {
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.poll-bubble-other .poll-option-selected {
-  border-color: #006cff;
 }
 
 .poll-option-fill {
@@ -1429,16 +1472,15 @@
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 10px;
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .poll-bubble-own .poll-option-fill {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.2); /* Zashly theme */
 }
 
 .poll-bubble-other .poll-option-fill {
-  background: rgba(0, 108, 255, 0.08);
+  background: rgba(0, 108, 255, 0.15); /* Zashly theme */
 }
 
 .poll-option-content {
@@ -1446,11 +1488,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   z-index: 1;
 }
 
 .poll-option-text {
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .poll-bubble-own .poll-option-text {
@@ -1464,7 +1508,69 @@
 .poll-option-meta {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.poll-voter-avatars {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.poll-voter-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid;
+  margin-left: -8px;
+  position: relative;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.poll-voter-avatar:first-child {
+  margin-left: 0;
+}
+
+.poll-bubble-own .poll-voter-avatar {
+  border-color: #006cff; /* Blend with own bubble */
+}
+
+.poll-bubble-other .poll-voter-avatar {
+  border-color: #f0f0f0; /* Blend with other bubble */
+}
+
+.poll-voter-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poll-voter-avatar-fallback {
+  font-size: 9px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.poll-option-count {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.poll-bubble-own .poll-option-count {
+  color: #ffffff;
+}
+
+.poll-bubble-other .poll-option-count {
+  color: #1a1a2e;
+}
+
+.poll-option-pct {
+  font-size: 13px;
+  opacity: 0.8;
 }
 
 .poll-check-icon {
@@ -2503,7 +2609,6 @@
   cursor: not-allowed;
 }
 
-/* ── In-Call Chat Messages ── */
 .chat-messages-container {
   flex: 1;
   overflow-y: auto;
@@ -2845,7 +2950,7 @@
 .chat-header-3d {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2910,8 +3015,17 @@
 .chat-header-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 12px;
   margin-left: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.chat-header-call-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .chat-header-action-btn {
@@ -3208,7 +3322,6 @@
   }
 }
 
-/* ── Also style Stream's native send button ────────────────── */
 .chat-3d-bg .str-chat__send-button {
   transition: all 0.2s ease;
 }
@@ -3253,12 +3366,10 @@
   }
 }
 
-/* ── Smooth Auto-Scroll ────────────────────────────────────── */
 .chat-3d-bg .str-chat__list {
   scroll-behavior: smooth;
 }
 
-/* ── 3D Modal Styling ──────────────────────────────────────── */
 .chat-modal-3d {
   background: rgba(15, 21, 36, 0.95) !important;
   backdrop-filter: blur(20px);
@@ -3301,12 +3412,10 @@
   background: transparent !important;
 }
 
-/* Message bubble custom styling overrides */
 .chat-3d-bg .str-chat__message-bubble {
   border-radius: 16px;
 }
 
-/* ── Updated group chat bubble styling for 3D ──────────────── */
 .chat-3d-bg .gc-msg-bubble {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3350,7 +3459,6 @@
   color: #ffffff;
 }
 
-/* ── Updated typing dots for 3D theme ──────────────────────── */
 .chat-3d-bg .gc-typing-dot {
   background: rgba(255, 255, 255, 0.4);
   animation: typing-3d-bounce 1.2s ease-in-out infinite;
@@ -3364,7 +3472,6 @@
   animation-delay: 0.4s;
 }
 
-/* ── Scrollbar Dark Theme ──────────────────────────────────── */
 .chat-3d-bg .str-chat__list::-webkit-scrollbar {
   width: 6px;
 }
@@ -3382,7 +3489,6 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* ── Input area dark overrides ─────────────────────────────── */
 .chat-3d-bg .wa-input-bubble {
   background: rgba(30, 40, 60, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3408,7 +3514,6 @@
   box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
 }
 
-/* ── Date separator styling ────────────────────────────────── */
 .chat-3d-bg .str-chat__date-separator {
   color: rgba(255, 255, 255, 0.35);
 }
@@ -3426,14 +3531,12 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* ── User name in group messages ───────────────────────────── */
 .chat-3d-bg .str-chat__message-simple-name {
   color: #667eea !important;
   font-size: 11px;
   font-weight: 700;
 }
 
-/* ── System messages ───────────────────────────────────────── */
 .chat-3d-bg .str-chat__message--system .str-chat__message--system__text p {
   color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
@@ -3467,9 +3570,20 @@
     font-size: 14px;
   }
 
+  .chat-header-actions {
+    gap: 0;
+  }
+
   .chat-header-action-btn {
     width: 32px;
     height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .chat-header-call-btn svg {
+    width: 1rem;
+    height: 1rem;
   }
 
   .chat-3d-bg .str-chat__message-text-inner {
@@ -3740,13 +3854,11 @@
   }
 }
 
-/* Dark theme border override */
 [data-theme="dark"] .nb-badge,
 .chat-3d-bg .nb-badge {
   border-color: #0a0e17;
 }
 
-/* ── 3. STATUS RING (sr-*) ─────────────────────────────────── */
 .sr-no-ring {
   position: relative;
   border-radius: 50%;
@@ -3761,18 +3873,15 @@
   animation: sr-appear 600ms cubic-bezier(0.68, -0.55, 0.27, 1.55) both;
 }
 
-/* Tap / click interaction */
 .sr-container:active {
   transform: scale(0.95);
   transition: transform 100ms ease;
 }
 
-/* Spring back — on mouse up the browser removes :active, the default state transitions back with spring-like feel */
 .sr-container {
   transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ── Rotating gradient ring */
 .sr-gradient {
   position: absolute;
   inset: -3px;
@@ -4067,7 +4176,6 @@
   to   { opacity: 0; }
 }
 
-/* ── Panel ────────────────────────────────────────────────────── */
 .sup-panel {
   position: relative;
   z-index: 1;
@@ -4561,7 +4669,6 @@
   to   { opacity: 0; }
 }
 
-/* Header */
 .profile-image-viewer-header {
   display: flex;
   align-items: center;
@@ -4596,7 +4703,6 @@
   transform: scale(1.08);
 }
 
-/* Body / Image area */
 .profile-image-viewer-body {
   flex: 1;
   display: flex;
@@ -4629,7 +4735,6 @@
   }
 }
 
-/* Fallback avatar (no image) */
 .profile-image-viewer-fallback {
   width: 200px;
   height: 200px;
@@ -4649,7 +4754,6 @@
   user-select: none;
 }
 
-/* Zoom controls */
 .profile-image-viewer-controls {
   display: flex;
   align-items: center;
@@ -4690,7 +4794,6 @@
   text-align: center;
 }
 
-/* ── Mobile adjustments ───────────────────────────────────────── */
 @media (max-width: 640px) {
   .profile-image-viewer-img {
     max-width: 100%;
@@ -4712,7 +4815,6 @@
   }
 }
 
-/* ── Reduced motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .sup-overlay,
   .sup-panel,

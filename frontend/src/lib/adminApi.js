@@ -31,8 +31,8 @@ export async function deleteUser(userId) {
 
 // â”€â”€ Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function getAdminGroups() {
-  const res = await axiosInstance.get("/admin/groups");
-  return res.data;
+  const res = await axiosInstance.get("/admin/groups", { params: { limit: 100 } });
+  return res.data.groups || res.data;
 }
 
 export async function deleteGroup(groupId) {
@@ -69,8 +69,8 @@ export async function forceLogout(userId) {
 
 // â”€â”€ Moderation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function getAdminReports() {
-  const res = await axiosInstance.get("/admin/reports");
-  return res.data;
+  const res = await axiosInstance.get("/admin/reports", { params: { limit: 100 } });
+  return res.data.reports || res.data;
 }
 
 export async function resolveReport(reportId, status) {
@@ -102,5 +102,41 @@ export async function updateAppConfig(data) {
 
 export async function getAnalyticsData(range = "30") {
   const res = await axiosInstance.get("/admin/analytics", { params: { range } });
+  return res.data;
+}
+
+// ── Password Reset Appeals ──
+export async function getPendingPasswordResets() {
+  const res = await axiosInstance.get("/admin/password-resets");
+  return res.data;
+}
+
+export async function approvePasswordReset(requestId) {
+  const res = await axiosInstance.post(`/admin/password-resets/${requestId}/approve`);
+  return res.data;
+}
+
+export async function rejectPasswordReset(requestId) {
+  const res = await axiosInstance.post(`/admin/password-resets/${requestId}/reject`);
+  return res.data;
+}
+
+export async function getAccountDeletionRequests() {
+  const res = await axiosInstance.get("/admin/account-deletions");
+  return res.data;
+}
+
+export async function approveAccountDeletion(requestId) {
+  const res = await axiosInstance.post(
+    `/admin/account-deletions/${requestId}/approve`
+  );
+  return res.data;
+}
+
+export async function rejectAccountDeletion(requestId, adminNote = "") {
+  const res = await axiosInstance.post(
+    `/admin/account-deletions/${requestId}/reject`,
+    { adminNote }
+  );
   return res.data;
 }

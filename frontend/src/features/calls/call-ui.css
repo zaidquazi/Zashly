@@ -1,0 +1,85 @@
+/* LiveKit Call UI — premium glassmorphism styles */
+.call-glass-modal {
+  @apply rounded-3xl p-8 shadow-2xl border border-white/10;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+}
+
+.call-action-btn {
+  @apply w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg transition-colors;
+}
+.call-action-btn.accept {
+  @apply bg-emerald-500 hover:bg-emerald-400;
+}
+.call-action-btn.reject {
+  @apply bg-red-500 hover:bg-red-400;
+}
+
+.call-controls-bar {
+  @apply absolute bottom-0 left-0 right-0 p-6 pb-8;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+}
+
+.call-control-btn {
+  @apply w-12 h-12 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-sm;
+}
+.call-control-btn.active {
+  @apply bg-primary/40 ring-1 ring-primary;
+}
+.call-control-btn.danger {
+  @apply bg-red-500/80;
+}
+.call-control-btn.warning {
+  @apply bg-amber-500/80;
+}
+.call-control-btn.hangup {
+  @apply bg-red-600 hover:bg-red-500 w-14 h-14;
+}
+
+.call-screen {
+  @apply relative w-full h-full flex flex-col;
+}
+
+.call-screen.voice-layout {
+  @apply items-center justify-center;
+}
+
+.call-main-video {
+  @apply absolute inset-0 bg-slate-900;
+}
+
+.call-pip-video {
+  @apply absolute top-4 right-4 w-32 h-44 sm:w-40 sm:h-56 rounded-xl overflow-hidden shadow-2xl border border-white/20 z-10;
+}
+
+.call-video-grid {
+  @apply grid auto-rows-fr min-h-0;
+}
+
+.call-grid-tile {
+  @apply relative rounded-2xl overflow-hidden bg-slate-800 aspect-video min-h-[140px] transition-all;
+}
+.call-grid-tile.speaker-active {
+  @apply ring-2 ring-primary shadow-lg shadow-primary/30;
+}
+
+.call-participant-label {
+  @apply absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-xs text-white bg-black/50 backdrop-blur-sm;
+}
+
+.call-participants-panel {
+  @apply w-72 bg-slate-900/95 border-l border-white/10 h-full shrink-0;
+}
+
+.call-floating-pill {
+  @apply rounded-2xl px-4 py-3 shadow-2xl border border-white/10 cursor-grab active:cursor-grabbing;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.premium-icon-btn.call-voice {
+  @apply text-emerald-500 hover:bg-emerald-500/10;
+}
+.premium-icon-btn.call-video {
+  @apply text-sky-500 hover:bg-sky-500/10;
+}

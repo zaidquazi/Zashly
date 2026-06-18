@@ -1,3 +1,4 @@
+import logger from "../monitoring/logger.js";
 import { StreamChat } from "stream-chat";
 import "dotenv/config";
 
@@ -9,7 +10,7 @@ if (apiKey && apiSecret) {
   try {
     streamClient = StreamChat.getInstance(apiKey, apiSecret);
   } catch (e) {
-    console.error("Stream Chat init failed:", e.message);
+    logger.error("Stream Chat init failed:", e.message);
   }
 } else {
   console.warn("Stream API key or secret missing – chat features disabled");
@@ -21,21 +22,21 @@ export const upsertStreamUser = async (userData) => {
     await streamClient.upsertUsers([userData]);
     return userData;
   } catch (error) {
-    console.error("Error upserting Stream user:", error);
+    logger.error("Error upserting Stream user:", error);
   }
   return userData;
 };
 
 export const generateStreamToken = (userId) => {
   if (!streamClient) {
-    console.error("Cannot generate token: Stream client not initialized");
+    logger.error("Cannot generate token: Stream client not initialized");
     return null;
   }
   try {
     const userIdStr = userId.toString();
     return streamClient.createToken(userIdStr);
   } catch (error) {
-    console.error("Error generating Stream token:", error);
+    logger.error("Error generating Stream token:", error);
   }
   return null;
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BarChart3, Check, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, Users, Circle, CheckCircle2 } from "lucide-react";
 import { getPoll, votePoll } from "../lib/api";
 import useAuthUser from "../hooks/useAuthUser";
 
@@ -44,22 +44,6 @@ const PollBubble = ({ pollId, isOwn, senderName, isGroupChat, socket }) => {
 
   const handleVote = async (optionIndex) => {
     if (!poll || voting) return;
-
-    // Check if already voted for this option
-    const option = poll.options[optionIndex];
-    const alreadyVoted = option.votes.some(
-      (v) => v.userId === userId || v.userId?._id === userId
-    );
-
-    if (alreadyVoted) return;
-
-    // If not multiple choice, check if voted for any option
-    if (!poll.multipleChoice) {
-      const hasVotedAny = poll.options.some((opt) =>
-        opt.votes.some((v) => v.userId === userId || v.userId?._id === userId)
-      );
-      if (hasVotedAny) return;
-    }
 
     setVoting(true);
     try {
@@ -114,26 +98,50 @@ const PollBubble = ({ pollId, isOwn, senderName, isGroupChat, socket }) => {
           const isSelected = option.votes.some(
             (v) => v.userId === userId || v.userId?._id === userId
           );
-          const canVote = !isSelected && (poll.multipleChoice || !hasVotedAny);
-
           return (
             <button
               key={idx}
-              className={`poll-option-bar ${isSelected ? "poll-option-selected" : ""} ${
-                canVote ? "poll-option-clickable" : "poll-option-disabled"
-              }`}
-              onClick={() => canVote && handleVote(idx)}
-              disabled={!canVote || voting}
+              className={`poll-option-row ${isSelected ? "poll-option-selected" : ""} poll-option-clickable`}
+              onClick={() => handleVote(idx)}
+              disabled={voting}
             >
-              <div
-                className="poll-option-fill"
-                style={{ width: `${percentage}%` }}
-              />
-              <div className="poll-option-content">
-                <span className="poll-option-text">{option.text}</span>
-                <div className="poll-option-meta">
-                  {isSelected && <Check size={14} className="poll-check-icon" />}
-                  <span className="poll-option-pct">{percentage}%</span>
+              <div className="poll-option-radio">
+                {isSelected ? (
+                  <CheckCircle2 size={20} className="poll-radio-icon poll-radio-active" />
+                ) : (
+                  <Circle size={20} className="poll-radio-icon poll-radio-inactive" />
+                )}
+              </div>
+              <div className="poll-option-bar-inner">
+                <div
+                  className="poll-option-fill"
+                  style={{ width: `${percentage}%` }}
+                />
+                <div className="poll-option-content">
+                  <span className="poll-option-text">{option.text}</span>
+                  <div className="poll-option-meta">
+                    {poll.showVoters && voteCount > 0 && (
+                      <div className="poll-voter-avatars">
+                        {option.votes.slice(0, 3).map((v, i) => (
+                          <div key={i} className="poll-voter-avatar" style={{ zIndex: 3 - i }}>
+                            {v.userId?.profilePic ? (
+                              <img src={v.userId.profilePic} alt="voter" />
+                            ) : (
+                              <div className="poll-voter-avatar-fallback">
+                                {(v.userId?.fullName || v.userId?.toString().slice(-6) || "?")[0].toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {voteCount > 0 && (
+                      <span className="poll-option-count">{voteCount}</span>
+                    )}
+                    {hasVotedAny && (
+                      <span className="poll-option-pct">({percentage}%)</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>

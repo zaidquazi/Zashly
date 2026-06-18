@@ -8,8 +8,7 @@ import {
   ShieldBanIcon,
   TrendingUpIcon,
   ActivityIcon,
-  BarChart3Icon,
-  VideoIcon
+  BarChart3Icon
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { getAdminStats } from "../../lib/adminApi";
@@ -92,14 +91,7 @@ const DashboardView = () => {
       bg: "bg-red-500/10",
       trend: "Sanitizing"
     },
-    {
-      label: "Video Connectivity",
-      value: stats.totalCalls || 0,
-      icon: VideoIcon,
-      color: "text-cyan-500",
-      bg: "bg-cyan-500/10",
-      trend: `${stats.activeCalls || 0} active now`
-    },
+
   ];
 
   return (
@@ -113,21 +105,21 @@ const DashboardView = () => {
         {cards.map((card, idx) => (
           <div
             key={card.label}
-            className="group relative bg-base-200 rounded-3xl p-5 sm:p-6 border border-base-300 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 shadow-sm"
+            className="group relative bg-base-200 rounded-2xl p-4 sm:p-5 border border-base-300 hover:border-primary/30 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 shadow-sm"
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`${card.bg} rounded-2xl p-3 group-hover:scale-110 transition-transform`}>
-                <card.icon className={`size-5 sm:size-6 ${card.color}`} />
+            <div className="flex items-start justify-between mb-2 sm:mb-3">
+              <div className={`${card.bg} rounded-xl p-2.5 group-hover:scale-110 transition-transform`}>
+                <card.icon className={`size-4 sm:size-5 ${card.color}`} />
               </div>
-              <ActivityIcon className="size-4 text-base-content/20" />
+              <ActivityIcon className="size-3.5 text-base-content/20" />
             </div>
             
             <div>
-              <p className="text-3xl sm:text-4xl font-black">{card.value.toLocaleString()}</p>
-              <div className="flex items-center justify-between mt-1">
-                 <p className="text-xs sm:text-sm font-semibold text-base-content/60">{card.label}</p>
-                 <span className="text-[9px] sm:text-[10px] font-bold text-success/70 bg-success/5 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <TrendingUpIcon className="size-2 sm:size-2.5" /> {card.trend}
+              <p className="text-2xl sm:text-3xl font-black leading-none mb-1.5">{card.value.toLocaleString()}</p>
+              <div className="flex items-center justify-between">
+                 <p className="text-[11px] sm:text-xs font-semibold text-base-content/60">{card.label}</p>
+                 <span className="text-[9px] font-bold text-success/70 bg-success/5 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <TrendingUpIcon className="size-2" /> {card.trend}
                  </span>
               </div>
             </div>

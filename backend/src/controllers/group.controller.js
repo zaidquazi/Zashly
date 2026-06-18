@@ -1,7 +1,20 @@
+import logger from "../monitoring/logger.js";
 import Group from "../models/Group.js";
 import User from "../models/User.js";
 import { getIO } from "../lib/socket.js";
 import { streamClient } from "../lib/stream.js";
+import {
+  validateBase64Upload,
+  secureFilename,
+  safeUploadPath,
+} from "../uploads/security/fileValidator.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { sanitizeUrl } from "../utils/security/sanitize.util.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function createGroup(req, res) {
   try {
@@ -43,7 +56,7 @@ export async function createGroup(req, res) {
         });
         await channel.create();
       } catch (err) {
-        console.error("Error creating Stream channel:", err);
+        logger.error("Error creating Stream channel:", err);
       }
     }
 
@@ -65,12 +78,12 @@ export async function createGroup(req, res) {
         });
       });
     } catch (socketErr) {
-      console.error("Socket emit error on group creation:", socketErr.message);
+      logger.error("Socket emit error on group creation:", socketErr.message);
     }
 
     res.status(201).json(populatedGroup);
   } catch (error) {
-    console.error("Error in createGroup:", error.message);
+    logger.error("Error in createGroup:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -88,7 +101,7 @@ export async function getMyGroups(req, res) {
 
     res.status(200).json(groups);
   } catch (error) {
-    console.error("Error in getMyGroups:", error.message);
+    logger.error("Error in getMyGroups:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -117,7 +130,7 @@ export async function getGroupById(req, res) {
 
     res.status(200).json(group);
   } catch (error) {
-    console.error("Error in getGroupById:", error.message);
+    logger.error("Error in getGroupById:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -126,13 +139,14 @@ export async function updateGroup(req, res) {
   try {
     const { groupId } = req.params;
     const userId = req.user._id;
-    const isGroupAdmin = group.admins.some(id => id.toString() === userId.toString()) || group.admin.toString() === userId.toString();
     const { name, description, avatar, settings } = req.body;
 
     const groupToUpdate = await Group.findById(groupId);
     if (!groupToUpdate) {
       return res.status(404).json({ message: "Group not found" });
     }
+
+    const isGroupAdmin = groupToUpdate.admins.some(id => id.toString() === userId.toString()) || groupToUpdate.admin.toString() === userId.toString();
 
     const canEditInfo = isGroupAdmin || (groupToUpdate.settings?.editInfo === "all");
 
@@ -147,7 +161,25 @@ export async function updateGroup(req, res) {
     const updateData = {};
     if (name !== undefined) updateData.name = name.trim();
     if (description !== undefined) updateData.description = description.trim();
-    if (avatar !== undefined) updateData.avatar = avatar;
+    if (avatar !== undefined) {
+      if (avatar && avatar.startsWith("data:")) {
+        const validation = validateBase64Upload(avatar, "image");
+        if (!validation.ok) {
+          return res.status(400).json({ message: validation.error });
+        }
+        const uploadRoot = path.join(__dirname, "../../uploads");
+        const filename = secureFilename(validation.ext);
+        const filepath = safeUploadPath(uploadRoot, filename);
+
+        if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot, { recursive: true });
+
+        fs.writeFileSync(filepath, validation.buffer);
+        const host = req.protocol + "://" + req.get("host");
+        updateData.avatar = `${host}/uploads/${filename}`;
+      } else {
+        updateData.avatar = avatar ? sanitizeUrl(avatar) : avatar;
+      }
+    }
     if (settings !== undefined) updateData.settings = { ...groupToUpdate.settings, ...settings };
 
     const updatedGroup = await Group.findByIdAndUpdate(groupId, updateData, {
@@ -163,12 +195,12 @@ export async function updateGroup(req, res) {
       const io = getIO();
       io.to(`group:${groupId}`).emit("group-updated", updatedGroup);
     } catch (socketErr) {
-      console.error("Socket emit error:", socketErr.message);
+      logger.error("Socket emit error:", socketErr.message);
     }
 
     res.status(200).json(updatedGroup);
   } catch (error) {
-    console.error("Error in updateGroup:", error.message);
+    logger.error("Error in updateGroup:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -227,7 +259,7 @@ export async function addMembers(req, res) {
           const channel = streamClient.channel("messaging", String(groupId));
           await channel.addMembers(newMemberIds.map(String));
         } catch (err) {
-          console.error("Error adding members to Stream channel:", err);
+          logger.error("Error adding members to Stream channel:", err);
         }
       }
     }
@@ -252,12 +284,12 @@ export async function addMembers(req, res) {
         });
       });
     } catch (socketErr) {
-      console.error("Socket emit error:", socketErr.message);
+      logger.error("Socket emit error:", socketErr.message);
     }
 
     res.status(200).json(updatedGroup);
   } catch (error) {
-    console.error("Error in addMembers:", error.message);
+    logger.error("Error in addMembers:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -283,7 +315,7 @@ export async function deleteGroupMessage(req, res) {
     await streamClient.deleteMessage(messageId);
     res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
-    console.error("Error deleting group message:", error);
+    logger.error("Error deleting group message:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -319,7 +351,7 @@ export async function removeMember(req, res) {
         const channel = streamClient.channel("messaging", String(groupId));
         await channel.removeMembers([String(targetUserId)]);
       } catch (err) {
-        console.error("Error removing member from Stream channel:", err);
+        logger.error("Error removing member from Stream channel:", err);
       }
     }
 
@@ -332,7 +364,7 @@ export async function removeMember(req, res) {
         removedUserId: targetUserId,
       });
     } catch (socketErr) {
-      console.error("Socket emit error:", socketErr.message);
+      logger.error("Socket emit error:", socketErr.message);
     }
 
     if (isSelf && isAdmin) {
@@ -352,7 +384,7 @@ export async function removeMember(req, res) {
 
     res.status(200).json({ message: isSelf ? "You left the group" : "Member removed" });
   } catch (error) {
-    console.error("Error in removeMember:", error.message);
+    logger.error("Error in removeMember:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -386,7 +418,9 @@ export async function promoteAdmin(req, res) {
 
     try {
       getIO().to(`group:${groupId}`).emit("group-updated", updatedGroup);
-    } catch (err) {}
+    } catch (err) {
+      logger.error("Socket emit error on promote admin:", err.message);
+    }
 
     res.status(200).json(updatedGroup);
   } catch (error) {
@@ -429,7 +463,9 @@ export async function demoteAdmin(req, res) {
 
     try {
       getIO().to(`group:${groupId}`).emit("group-updated", updatedGroup);
-    } catch (err) {}
+    } catch (err) {
+      logger.error("Socket emit error on demote admin:", err.message);
+    }
 
     res.status(200).json(updatedGroup);
   } catch (error) {
@@ -468,7 +504,7 @@ export async function approveMember(req, res) {
         const channel = streamClient.channel("messaging", String(groupId));
         await channel.addMembers([String(targetUserId)]);
       } catch (err) {
-        console.error("Error adding approved member to Stream channel:", err);
+        logger.error("Error adding approved member to Stream channel:", err);
       }
     }
 
@@ -481,7 +517,9 @@ export async function approveMember(req, res) {
           group: updatedGroup,
         });
       }
-    } catch (err) {}
+    } catch (err) {
+      logger.error("Socket emit error on approve member:", err.message);
+    }
 
     res.status(200).json(updatedGroup);
   } catch (error) {
@@ -514,7 +552,9 @@ export async function rejectMember(req, res) {
 
     try {
       getIO().to(`group:${groupId}`).emit("group-updated", updatedGroup);
-    } catch (err) {}
+    } catch (err) {
+      logger.error("Socket emit error on reject member:", err.message);
+    }
 
     res.status(200).json(updatedGroup);
   } catch (error) {

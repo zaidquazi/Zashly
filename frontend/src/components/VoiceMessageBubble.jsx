@@ -69,7 +69,7 @@ const VoiceMessageBubble = ({ audioSrc, duration, isOwn, senderName, isGroupChat
   const displayDuration = isPlaying ? currentTime : audioDuration;
 
   return (
-    <div className={`vm-bubble ${isOwn ? "vm-bubble-own" : "vm-bubble-other"}`}>
+    <div className={`premium-vm-bubble ${isOwn ? "own" : "other"}`}>
       {isGroupChat && !isOwn && senderName && (
         <div className="vm-sender-name">{senderName}</div>
       )}
