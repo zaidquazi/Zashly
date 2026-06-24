@@ -63,7 +63,7 @@ export async function updateProfile(req, res) {
         name: updatedUser.fullName,
         image: updatedUser.profilePic || "",
       });
-    } catch (streamError) {}
+    } catch (streamError) { }
 
     res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {

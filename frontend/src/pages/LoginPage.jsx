@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { 
-  LoaderPinwheel, 
   Eye, 
   EyeOff, 
   ArrowRight,
@@ -14,6 +13,7 @@ import {
   User,
   Loader2
 } from "lucide-react";
+import Logo from "../components/Logo";
 import { Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import useLogin from "../hooks/useLogin";
@@ -29,6 +29,7 @@ const LoginPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [shakeCheckbox, setShakeCheckbox] = useState(false);
 
   // Focus states for input animations
   const [isIdentifierFocused, setIsIdentifierFocused] = useState(false);
@@ -39,6 +40,12 @@ const LoginPage = () => {
   const handleLogin = (e) => {
     e.preventDefault();
     if (!loginData.identifier.trim() || !loginData.password.trim()) return;
+
+    if (!loginData.rememberMe) {
+      setShakeCheckbox(true);
+      setTimeout(() => setShakeCheckbox(false), 500);
+      return;
+    }
     
     // Pass rememberMe if the backend supports it, otherwise it handles the standard login.
     loginMutation({
@@ -75,8 +82,8 @@ const LoginPage = () => {
               className="mb-8 text-center lg:text-left flex flex-col items-center lg:items-start"
             >
               <div className="mb-6 flex items-center justify-center lg:justify-start gap-2">
-                <LoaderPinwheel className="size-8 text-primary drop-shadow-md animate-spin-slow" />
-                <span className="text-3xl font-extrabold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-tight">
+                <Logo className="size-8 text-primary drop-shadow-md animate-spin-slow" />
+                <span className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary to-secondary">
                   Zashly
                 </span>
               </div>
@@ -164,21 +171,30 @@ const LoginPage = () => {
                 
                 {/* Remember Me & Forgot Password Row */}
                 <div className="flex items-center justify-between pt-1 px-1">
-                  <label className="flex items-center gap-2 cursor-pointer group">
+                  <motion.label 
+                    animate={shakeCheckbox ? { x: [-8, 8, -6, 6, -4, 4, 0] } : {}}
+                    transition={{ duration: 0.4 }}
+                    className="flex items-center gap-2 cursor-pointer group"
+                  >
                     <div className="relative flex items-center justify-center mt-0.5">
                       <input 
                         type="checkbox" 
-                        className="appearance-none size-4 border-[1.5px] border-base-300 rounded bg-base-100 checked:bg-primary checked:border-primary transition-all peer disabled:opacity-50 disabled:cursor-not-allowed" 
+                        className={`appearance-none size-4 border-[1.5px] rounded transition-all peer disabled:opacity-50 disabled:cursor-not-allowed
+                          ${shakeCheckbox ? 'border-error bg-error/10' : 'border-base-300 bg-base-100 checked:bg-primary checked:border-primary'}
+                        `} 
                         checked={loginData.rememberMe}
-                        onChange={(e) => setLoginData({...loginData, rememberMe: e.target.checked})}
+                        onChange={(e) => {
+                          setLoginData({...loginData, rememberMe: e.target.checked});
+                          if (e.target.checked) setShakeCheckbox(false);
+                        }}
                         disabled={isPending}
                       />
-                      <svg className="size-3 text-primary-content absolute opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      <svg className={`size-3 absolute opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none ${shakeCheckbox ? 'text-error' : 'text-primary-content'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     </div>
-                    <span className={`text-[11px] font-medium transition-opacity ${isPending ? 'opacity-40' : 'opacity-70 group-hover:opacity-100'}`}>
+                    <span className={`text-[11px] font-medium transition-all ${isPending ? 'opacity-40' : (shakeCheckbox ? 'opacity-100 text-error' : 'opacity-70 group-hover:opacity-100')}`}>
                       Keep me signed in
                     </span>
-                  </label>
+                  </motion.label>
 
                   <button
                     type="button"
@@ -196,7 +212,7 @@ const LoginPage = () => {
                 type="submit" 
                 className={`w-full rounded-xl py-3 mt-2 text-sm font-medium shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 group
                   ${isPending || !loginData.identifier || !loginData.password 
-                    ? 'btn-disabled opacity-50' 
+                    ? 'btn-disabled opacity-50 cursor-not-allowed' 
                     : 'btn btn-primary min-h-0 h-auto'
                   }
                 `}

@@ -60,25 +60,11 @@ const NotificationsPage = () => {
 
 
 
-  const previousCountRef = useRef(0);
-  const audioRef = useRef(null);
-
-  useEffect(() => {
-    // Play sound when new requests appear
-    const currentCount = friendRequests?.incomingReqs?.length || 0;
-    if (currentCount > previousCountRef.current) {
-      audioRef.current?.play().catch((err) => console.log("Audio play error:", err));
-    }
-    previousCountRef.current = currentCount;
-  }, [friendRequests]);
-
   const incomingRequests = friendRequests?.incomingReqs || [];
   const acceptedRequests = friendRequests?.acceptedReqs || [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* audio */}
-      <audio ref={audioRef} src="/notification.wav" preload="auto" />
       <div className="container mx-auto space-y-10">
         {/* Nav */}
         

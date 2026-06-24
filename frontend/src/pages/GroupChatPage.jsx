@@ -8,13 +8,15 @@ import { connectStreamUser } from "../lib/streamClient";
 import GroupInfoPanel from "../components/GroupInfoPanel";
 import PinnedMessagesBar from "../components/PinnedMessagesBar";
 import ChatEffectsWrapper from "../components/ChatEffectsWrapper";
+import { MultiSelectProvider, useMultiSelect } from "../context/MultiSelectContext";
+import SelectionActionBar from "../components/SelectionActionBar";
+import ForwardModal from "../components/ForwardModal";
 
 import {
   Channel,
   Chat,
   MessageInput,
   MessageList,
-  Thread,
   Window,
   useChannelStateContext,
   useChatContext,
@@ -24,7 +26,7 @@ import toast from "react-hot-toast";
 
 import "../chat-redesign.css";
 import ChatLoader from "../components/ChatLoader";
-import { InfoIcon, Trash2Icon, Moon, Sun, Phone, Video } from "lucide-react";
+import { InfoIcon, Trash2Icon, Moon, Sun, Phone, Video, MoreVertical } from "lucide-react";
 import { useCallSession } from "../features/calls/hooks/useCallSession";
 import useCallStore from "../features/calls/store/callSlice";
 import CustomMessageRenderer from "../components/CustomMessageRenderer";
@@ -32,14 +34,6 @@ import CustomMessageInput from "../components/CustomMessageInput";
 import useSocket from "../hooks/useSocket";
 
 const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
-const currentHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-let envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
-
-if (envApiUrl.includes("localhost") && currentHost !== "localhost") {
-  envApiUrl = envApiUrl.replace("localhost", currentHost);
-}
-
-const SOCKET_URL = envApiUrl || `http://${currentHost}:5002`;
 
 // ── Gradient helper ────────────────────────────────────────
 function getAvatarGradient(name) {
@@ -87,6 +81,7 @@ const GroupChatPage = () => {
 
   const CustomGroupHeader = ({ group }) => {
     const { watcher_count } = useChannelStateContext();
+    const [menuOpen, setMenuOpen] = useState(false);
     if (!group) return null;
     const [from, to] = getAvatarGradient(group.name);
     const initial = (group.name || "?")[0].toUpperCase();
@@ -94,25 +89,26 @@ const GroupChatPage = () => {
 
     return (
       <div className="premium-chat-header">
+
         <div className="premium-chat-header-info" onClick={() => setShowInfo(true)}>
           <div className="relative">
             <div
-              className="str-chat__avatar str-chat__avatar--rounded"
-              style={{ width: 40, height: 40, flexShrink: 0 }}
+              className="str-chat__avatar str-chat__avatar--rounded shadow-sm border border-base-200"
+              style={{ width: 48, height: 48, flexShrink: 0 }}
             >
               {group.avatar ? (
                 <img
                   src={group.avatar}
                   alt={group.name}
-                  style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }}
+                  style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }}
                 />
               ) : (
                 <div
                   style={{
-                    width: 40, height: 40, borderRadius: "50%",
+                    width: 48, height: 48, borderRadius: "50%",
                     background: `linear-gradient(135deg, ${from}, ${to})`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontWeight: 700, fontSize: 16,
+                    color: "#fff", fontWeight: 700, fontSize: 18,
                   }}
                 >
                   {initial}
@@ -120,17 +116,17 @@ const GroupChatPage = () => {
               )}
             </div>
           </div>
-          <div className="premium-chat-header-text">
-            <p className="premium-chat-header-name">
+          <div className="premium-chat-header-text pl-1">
+            <p className="premium-chat-header-name text-[17px]">
               {group.name}
             </p>
-            <p className="premium-chat-header-status">
+            <p className="premium-chat-header-status text-[13px] opacity-80">
               {group.members?.length ?? 0} members{onlineCount > 0 ? `, ${onlineCount} online` : ""}
             </p>
           </div>
         </div>
 
-        <div className="premium-chat-header-actions">
+        <div className="premium-chat-header-actions relative">
           <button
             type="button"
             className="premium-icon-btn call-voice"
@@ -141,7 +137,7 @@ const GroupChatPage = () => {
             }}
             title="Group voice call"
           >
-            <Phone className="size-4 sm:size-5" />
+            <Phone className="size-5" />
           </button>
           <button
             type="button"
@@ -153,27 +149,34 @@ const GroupChatPage = () => {
             }}
             title="Group video call"
           >
-            <Video className="size-4 sm:size-5" />
-          </button>
-          <button
-            type="button"
-            className="premium-icon-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleChatTheme();
-            }}
-            title="Toggle Theme"
-          >
-            {chatTheme === "str-chat__theme-dark" ? (
-              <Sun className="size-4 sm:size-5 text-warning" />
-            ) : (
-              <Moon className="size-4 sm:size-5" />
-            )}
+            <Video className="size-5" />
           </button>
 
-
+          <div className="dropdown dropdown-end">
+            <button
+              tabIndex={0}
+              type="button"
+              className="premium-icon-btn text-base-content/70 hover:bg-base-200 ml-1"
+              title="More Options"
+            >
+              <MoreVertical className="size-6" />
+            </button>
+            <ul tabIndex={0} className="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-200">
+              <li><a onClick={() => setShowInfo(true)}>Group Info</a></li>
+            </ul>
+          </div>
         </div>
       </div>
+    );
+  };
+
+  const GroupChatHeaderContainer = ({ group }) => {
+    const { isSelectionMode } = useMultiSelect();
+    const isAdmin = group?.admin?._id === authUser?._id || group?.admin === authUser?._id;
+    return isSelectionMode ? (
+      <SelectionActionBar isGroupChat={true} isGroupAdmin={isAdmin} />
+    ) : (
+      <CustomGroupHeader group={group} />
     );
   };
 
@@ -360,12 +363,14 @@ const GroupChatPage = () => {
                 style={chatWallpaperStyle}
               >
                 {/* Stream Window with custom header that syncs with MongoDB */}
-                <Window>
-                  <CustomGroupHeader
-                    group={group}
-                  />
+                <MultiSelectProvider>
+                  <Window>
+                    <GroupChatHeaderContainer group={group} />
                   <PinnedMessagesSection />
-                  <MessageList Message={MessageWithExtras} />
+                  <MessageList
+                    Message={MessageWithExtras}
+                    messageActions={['edit', 'delete', 'flag', 'mute', 'pin', 'quote', 'react']}
+                  />
                   <MessageInput
                     focus
                     additionalTextareaProps={{
@@ -386,6 +391,7 @@ const GroupChatPage = () => {
                     )}
                   />
                 </Window>
+                <ForwardModal />
 
 
                 {/* Clear Chat Confirmation Modal */}
@@ -402,11 +408,11 @@ const GroupChatPage = () => {
                     <div className="modal-backdrop bg-black/40" onClick={() => setShowClearModal(false)}></div>
                   </div>
                 )}
+                </MultiSelectProvider>
               </div>
             )}
           </ChatEffectsWrapper>
-          
-          <Thread />
+
         </Channel>
       </Chat>
 

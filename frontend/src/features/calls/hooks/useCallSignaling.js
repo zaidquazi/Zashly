@@ -132,15 +132,42 @@ export function useCallSignaling() {
     };
   }, [isConnected, on, setIncomingCall, setOutgoingCall, resetCall, setConnected]);
 
+  const ensureMediaPermissions = async (callType) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: callType === "video",
+      });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (err) {
+      console.error("Media permissions error:", err);
+      toast.error("Camera/Microphone permissions are required for calls");
+      return false;
+    }
+  };
+
   const initiateCall = useCallback(
-    (payload, ack) => {
+    async (payload, ack) => {
+      const hasPerms = await ensureMediaPermissions(payload.callType);
+      if (!hasPerms) {
+        if (ack) ack({ success: false, error: "Permissions denied" });
+        return;
+      }
       return emit("call:initiate", { ...payload, callerId: authUser?._id }, ack);
     },
     [emit, authUser?._id]
   );
 
   const acceptCall = useCallback(
-    (callId) => emit("call:accept", { callId, userId: authUser?._id }),
+    async (callId) => {
+      const state = useCallStore.getState();
+      const type = state.incomingCall?.callType || "voice";
+      const hasPerms = await ensureMediaPermissions(type);
+      if (!hasPerms) return;
+      
+      emit("call:accept", { callId, userId: authUser?._id });
+    },
     [emit, authUser?._id]
   );
 

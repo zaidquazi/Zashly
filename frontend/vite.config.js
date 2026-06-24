@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // base: './' is critical for Capacitor — assets use relative paths
+  // so the WebView (which serves from file://) can find them.
+  // This also remains compatible with web deployment.
+  base: "./",
   server: {
     allowedHosts: ["localtest.me"],
     proxy: {
@@ -15,6 +19,12 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  optimizeDeps: {
+    // Pre-bundle Capacitor packages for faster dev server startup
+    include: ["@capacitor/core"],
+    // Exclude native-only packages that don't need bundling
+    exclude: [],
   },
   build: {
     target: "es2020",
@@ -35,6 +45,7 @@ export default defineConfig({
           if (id.includes("recharts") || id.includes("d3-")) return "charts";
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("@tanstack")) return "query";
+          if (id.includes("@capacitor")) return "capacitor";
           if (
             id.includes("react-dom") ||
             id.includes("react-router") ||
@@ -49,4 +60,3 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
   },
 });
-

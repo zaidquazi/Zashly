@@ -38,7 +38,7 @@ const LOCK_MINUTES = Number(process.env.ACCOUNT_LOCK_MINUTES) || 15;
 
 async function completeAuthResponse(req, res, user, statusCode = 200, rememberMe = false) {
   const meta = { ip: getClientIp(req), userAgent: getUserAgent(req) };
-  const { sessionId, refreshJwt } = setAuthCookies(res, user, rememberMe);
+  const { sessionId, refreshJwt, accessJwt } = setAuthCookies(res, user, rememberMe);
   await persistRefreshSession(user, sessionId, refreshJwt, meta, rememberMe);
 
   user.security = user.security || {};
@@ -46,7 +46,12 @@ async function completeAuthResponse(req, res, user, statusCode = 200, rememberMe
   user.security.lastDevice = meta.userAgent;
   await user.save();
 
-  return res.status(statusCode).json({ success: true, user: toSafeUser(user) });
+  return res.status(statusCode).json({ 
+    success: true, 
+    user: toSafeUser(user),
+    accessToken: accessJwt,
+    refreshToken: refreshJwt
+  });
 }
 
 export async function signup(req, res) {
@@ -164,7 +169,7 @@ export async function login(req, res) {
 
 export async function refreshAccessToken(req, res) {
   try {
-    const refreshCookie = req.cookies?.refreshToken;
+    const refreshCookie = req.cookies?.refreshToken || req.headers['x-refresh-token'];
     if (!refreshCookie) {
       return res.status(401).json({ message: "Refresh token required" });
     }
@@ -205,7 +210,12 @@ export async function refreshAccessToken(req, res) {
     
     res.cookie("jwt", accessJwt, accessTokenCookieOptions);
     
-    return res.status(200).json({ success: true, user: toSafeUser(user) });
+    return res.status(200).json({ 
+      success: true, 
+      user: toSafeUser(user),
+      accessToken: accessJwt,
+      refreshToken: refreshCookie
+    });
   } catch (error) {
     clearSessionCookies(res);
     return res.status(401).json({ message: "Invalid refresh token" });
@@ -213,7 +223,7 @@ export async function refreshAccessToken(req, res) {
 }
 
 export function logout(req, res) {
-  const token = req.cookies?.refreshToken;
+  const token = req.cookies?.refreshToken || req.headers['x-refresh-token'];
   if (token) {
     try {
       const decoded = jwt.decode(token);

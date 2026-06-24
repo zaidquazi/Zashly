@@ -86,9 +86,18 @@ function GroupCallContent() {
   );
 }
 
+import { KeepAwake } from '@capacitor-community/keep-awake';
+
 export function GroupCallScreen() {
   const { hangUp: endSession } = useCallSession();
   const { isMinimized } = useCallStore();
+
+  useEffect(() => {
+    KeepAwake.keepAwake().catch(() => {});
+    return () => {
+      KeepAwake.allowSleep().catch(() => {});
+    };
+  }, []);
 
   if (isMinimized) return null;
 

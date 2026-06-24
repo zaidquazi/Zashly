@@ -1,5 +1,5 @@
 import logger from "../monitoring/logger.js";
-import { generateStreamToken } from "../lib/stream.js";
+import { generateStreamToken, streamClient } from "../lib/stream.js";
 import Poll from "../models/Poll.js";
 import { getIO } from "../lib/socket.js";
 
@@ -123,6 +123,32 @@ export async function getPoll(req, res) {
     res.status(200).json(poll);
   } catch (error) {
     logger.error("Error in getPoll:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function truncateChannel(req, res) {
+  try {
+    const { channelId, type = "messaging" } = req.body;
+    if (!channelId) {
+      return res.status(400).json({ message: "channelId is required" });
+    }
+    if (!streamClient) {
+      return res.status(503).json({ message: "Chat service unavailable" });
+    }
+
+    const channel = streamClient.channel(type, channelId);
+    
+    // Check if user is part of the channel
+    const members = await channel.queryMembers({ user_id: req.user.id });
+    if (members.members.length === 0) {
+      return res.status(403).json({ message: "Not authorized to truncate this channel" });
+    }
+
+    await channel.truncate();
+    res.status(200).json({ message: "Channel truncated successfully" });
+  } catch (error) {
+    logger.error("Error in truncateChannel:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

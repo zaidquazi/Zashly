@@ -5,7 +5,7 @@ export const updateProfileSchema = Joi.object({
     fullName: Joi.string().min(2).max(100).trim(),
     bio: Joi.string().max(500).allow("").trim(),
     location: Joi.string().max(120).allow("").trim(),
-    profilePic: Joi.string().uri().max(2048).allow(""),
+    profilePic: Joi.string().allow(""),
   }).min(1),
 });
 

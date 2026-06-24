@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams } from "react-router";
+import { useParams, useNavigate } from "react-router";
 import useAuthUser from "../hooks/useAuthUser";
 import { useQuery } from "@tanstack/react-query";
 import { getStreamToken } from "../lib/api";
@@ -9,13 +9,15 @@ import CustomMessageRenderer from "../components/CustomMessageRenderer";
 import CustomMessageInput from "../components/CustomMessageInput";
 import UserProfileModal from "../components/UserProfileModal";
 import ChatEffectsWrapper from "../components/ChatEffectsWrapper";
+import { MultiSelectProvider, useMultiSelect } from "../context/MultiSelectContext";
+import SelectionActionBar from "../components/SelectionActionBar";
+import ForwardModal from "../components/ForwardModal";
 
 import {
   Channel,
   Chat,
   MessageInput,
   MessageList,
-  Thread,
   Window,
   useChannelStateContext,
 } from "stream-chat-react";
@@ -23,7 +25,8 @@ import { StreamChat } from "stream-chat";
 import toast from "react-hot-toast";
 import useSocket from "../hooks/useSocket";
 import ProfileAvatar from "../components/ProfileAvatar";
-import { Trash2Icon, Moon, Sun } from "lucide-react";
+import { Trash2Icon, Moon, Sun, MoreVertical } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import CallButtons from "../features/calls/components/CallButtons";
 import "../chat-redesign.css";
 
@@ -31,6 +34,7 @@ const STREAM_API_KEY = import.meta.env.VITE_STREAM_API_KEY;
 
 const ChatPage = () => {
   const { id: targetUserId } = useParams();
+  const navigate = useNavigate();
   const [chatClient, setChatClient] = useState(null);
   const [channel, setChannel] = useState(null);
   const [chatTheme, setChatTheme] = useState(() => {
@@ -63,15 +67,27 @@ const ChatPage = () => {
 
   const CustomHeader = () => {
     const { channel } = useChannelStateContext();
+    const [menuOpen, setMenuOpen] = useState(false);
     if (!channel) return null;
 
     const members = Object.values(channel.state.members);
     const otherMember = members.find((m) => m.user.id !== authUser?._id);
     const displayUser = otherMember?.user || {};
     const isOnline = displayUser.online;
+    
+    let statusText = isOnline ? "Online" : "Offline";
+    if (!isOnline && displayUser.last_active) {
+      try {
+        const lastActive = new Date(displayUser.last_active);
+        statusText = `Last seen ${formatDistanceToNow(lastActive, { addSuffix: true })}`;
+      } catch (e) {
+        // Fallback
+      }
+    }
 
     return (
       <div className="premium-chat-header">
+
         <div 
           className="premium-chat-header-info"
           onClick={() => setShowProfile(true)}
@@ -80,62 +96,52 @@ const ChatPage = () => {
             <ProfileAvatar 
               src={displayUser.image || displayUser.profilePic} 
               name={displayUser.name || displayUser.fullName || "User"} 
-              size="w-11 h-11" 
-              textSize="text-base" 
+              size="w-12 h-12" 
+              textSize="text-lg" 
             />
             {isOnline && (
-              <span className="absolute bottom-0 right-0 premium-online-dot" />
+              <span className="absolute bottom-0 right-0 premium-online-dot border-2 border-white" />
             )}
           </div>
-          <div className="premium-chat-header-text">
-            <p className="premium-chat-header-name">
+          <div className="premium-chat-header-text pl-1">
+            <p className="premium-chat-header-name text-[17px]">
               {displayUser.name || displayUser.fullName || "User"}
             </p>
-            <p className="premium-chat-header-status">
-              {isOnline ? "Online" : "Offline"}
+            <p className="premium-chat-header-status text-[13px] opacity-80">
+              {statusText}
             </p>
           </div>
         </div>
 
-        <div className="premium-chat-header-actions">
+        <div className="premium-chat-header-actions relative">
           <CallButtons
             targetId={displayUser.id || targetUserId}
             targetName={displayUser.name || displayUser.fullName}
             targetPic={displayUser.image || displayUser.profilePic}
           />
 
-          <button
-            type="button"
-            className="premium-icon-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleChatTheme();
-            }}
-            title="Toggle Theme"
-          >
-            {chatTheme === "str-chat__theme-dark" ? (
-              <Sun className="size-5 text-yellow-500" />
-            ) : (
-              <Moon className="size-5" />
-            )}
-          </button>
-
-
-
-          <button
-            type="button"
-            className="premium-icon-btn danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowClearModal(true);
-            }}
-            title="Clear Chat"
-          >
-            <Trash2Icon className="size-5" />
-          </button>
+          <div className="dropdown dropdown-end">
+            <button
+              tabIndex={0}
+              type="button"
+              className="premium-icon-btn text-base-content/70 hover:bg-base-200 ml-1"
+              title="More Options"
+            >
+              <MoreVertical className="size-6" />
+            </button>
+            <ul tabIndex={0} className="dropdown-content z-[100] menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-200">
+              <li><a onClick={() => setShowProfile(true)}>View Profile</a></li>
+              <li><a onClick={() => setShowClearModal(true)} className="text-error font-medium">Clear Chat</a></li>
+            </ul>
+          </div>
         </div>
       </div>
     );
+  };
+
+  const ChatHeaderContainer = () => {
+    const { isSelectionMode } = useMultiSelect();
+    return isSelectionMode ? <SelectionActionBar isGroupChat={false} /> : <CustomHeader />;
   };
 
   const handleClearChat = async () => {
@@ -237,9 +243,13 @@ const ChatPage = () => {
                 }`}
                 style={chatWallpaperStyle}
               >
-                <Window>
-                  <CustomHeader />
-                  <MessageList Message={MessageWithExtras} />
+                <MultiSelectProvider>
+                  <Window>
+                    <ChatHeaderContainer />
+                    <MessageList
+                    Message={MessageWithExtras}
+                    messageActions={['edit', 'delete', 'flag', 'mute', 'pin', 'quote', 'react']}
+                  />
                   <MessageInput
                     focus
                     additionalTextareaProps={{
@@ -260,6 +270,7 @@ const ChatPage = () => {
                     )}
                   />
                 </Window>
+                <ForwardModal />
                 
                 {showProfile && (
                   <UserProfileModal 
@@ -282,10 +293,11 @@ const ChatPage = () => {
                     <div className="modal-backdrop bg-black/40" onClick={() => setShowClearModal(false)}></div>
                   </div>
                 )}
+                </MultiSelectProvider>
               </div>
             )}
           </ChatEffectsWrapper>
-          <Thread />
+
         </Channel>
       </Chat>
     </div>

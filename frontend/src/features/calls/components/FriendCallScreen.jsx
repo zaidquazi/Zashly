@@ -85,9 +85,19 @@ function FriendCallContent() {
   );
 }
 
+import { KeepAwake } from '@capacitor-community/keep-awake';
+
 export function FriendCallScreen() {
   const { hangUp } = useCallSession();
   const { isMinimized } = useCallStore();
+
+  useEffect(() => {
+    // Keep screen awake while in call
+    KeepAwake.keepAwake().catch(() => {});
+    return () => {
+      KeepAwake.allowSleep().catch(() => {});
+    };
+  }, []);
 
   if (isMinimized) return null;
 

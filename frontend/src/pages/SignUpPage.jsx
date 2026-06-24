@@ -11,11 +11,10 @@ import {
   Lock, 
   Shield, 
   Zap, 
-  LoaderPinwheel, 
-  ArrowRight,
   User,
   Sparkles
 } from "lucide-react";
+import Logo from "../components/Logo";
 
 import useSignUp from "../hooks/useSignUp";
 import { checkUsernameAvailability } from "../lib/api";
@@ -173,8 +172,8 @@ const SignUpPage = () => {
               className="mb-8 text-center lg:text-left flex flex-col items-center lg:items-start"
             >
               <div className="mb-6 flex items-center justify-center lg:justify-start gap-2">
-                <LoaderPinwheel className="size-8 text-primary drop-shadow-md animate-spin-slow" />
-                <span className="text-3xl font-extrabold font-mono bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary tracking-tight">
+                <Logo className="size-8 text-primary drop-shadow-md animate-spin-slow" />
+                <span className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary to-secondary">
                   Zashly
                 </span>
               </div>

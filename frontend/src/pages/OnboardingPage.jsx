@@ -10,11 +10,11 @@ import {
   XIcon,
   ArrowRight,
   ArrowLeft,
-  LoaderPinwheel,
   Globe2,
   Users,
   Star
 } from "lucide-react";
+import Logo from "../components/Logo";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -172,7 +172,7 @@ const OnboardingPage = () => {
   const slides = [
     {
       id: "welcome",
-      icon: <LoaderPinwheel className="w-20 h-20 text-primary mx-auto mb-8 drop-shadow-[0_0_15px_rgba(var(--p),0.5)] animate-spin-slow" />,
+      icon: <Logo className="w-20 h-20 text-primary mx-auto mb-8 drop-shadow-[0_0_15px_rgba(var(--p),0.5)] animate-spin-slow" />,
       title: "Welcome to Zashly",
       subtitle: "Your premium networking and messaging experience starts here.",
     },

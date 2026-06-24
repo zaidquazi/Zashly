@@ -194,17 +194,18 @@ const useNotifications = () => {
           if (!event?.message) return;
 
           const channelName = event.channel?.name;
+          const channelId = event.channel?.id;
           const isGroup = Boolean(channelName);
           if (isGroup && !notifPrefs.groups) return;
           if (!isGroup && !notifPrefs.messages) return;
 
-          // ── Check if user is currently viewing this chat ──
-          const currentPath = window.location.pathname;
-          const channelId = event.channel_id || event?.cid?.split(":")[1];
+          // ── Always play sound for new incoming messages ──
+          playSound();
 
+          const currentPath = window.location.pathname;
           const isViewingThisChat =
             currentPath === `/chat/${event.user.id}` ||
-            currentPath === `/group/${channelId}`;
+            (channelId && currentPath === `/group/${channelId}`);
 
           if (isViewingThisChat) return;
 

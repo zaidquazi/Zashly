@@ -3,11 +3,12 @@ import mongoose from "mongoose";
 const momentSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    mediaUrl: { type: String, required: true },
-    type: { type: String, enum: ["image", "video"], required: true },
+    mediaUrl: { type: String, required: false },
+    type: { type: String, enum: ["image", "video", "text", "voice", "gif", "poll", "question"], required: true },
     durationMs: { type: Number, default: 5000 },
     expiresAt: { type: Date, required: true },
     viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

@@ -50,13 +50,21 @@ const VoiceMessageBubble = ({ audioSrc, duration, isOwn, senderName, isGroupChat
 
   const handleProgressClick = (e) => {
     const audio = audioRef.current;
-    if (!audio || !audio.duration) return;
+    if (!audio) return;
+    const safeDuration = isFinite(audio.duration) ? audio.duration : duration;
+    if (!safeDuration || !isFinite(safeDuration)) return;
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const pct = x / rect.width;
-    audio.currentTime = pct * audio.duration;
-    setProgress(pct * 100);
-    setCurrentTime(audio.currentTime);
+    
+    try {
+      audio.currentTime = pct * safeDuration;
+      setProgress(pct * 100);
+      setCurrentTime(pct * safeDuration);
+    } catch (err) {
+      console.warn("Could not seek audio", err);
+    }
   };
 
   const formatTime = (sec) => {

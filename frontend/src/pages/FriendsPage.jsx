@@ -55,21 +55,6 @@ const FriendsPage = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Friends</h1>
           <div className="flex gap-4 items-center">
-            {import.meta.env.DEV && (
-              <button 
-                className="btn btn-xs btn-outline"
-                onClick={() => {
-                  console.log("--- DEBUG INFO ---");
-                  console.log("Roster Ready:", isRosterReady());
-                  console.log("Global Roster IDs:", Array.from(getOnlineUserIds()));
-                  console.log("API Friends:", apiFriends.map(f => ({ id: f._id, name: f.fullName, apiIsOnline: f.isOnline })));
-                  console.log("Merged Friends:", friends.map(f => ({ id: f._id, name: f.fullName, mergedIsOnline: f.isOnline })));
-                  console.log("isConnected:", isConnected);
-                }}
-              >
-                Debug Roster
-              </button>
-            )}
             <span className="text-sm text-base-content/50">{friends.length} total</span>
           </div>
         </div>
@@ -77,15 +62,15 @@ const FriendsPage = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className={`btn btn-sm flex items-center gap-2 transition-all ${
+            className={`btn sm:btn-sm min-h-[44px] sm:min-h-0 flex items-center gap-2 transition-all ${
               filterStatus === "online" ? "btn-primary" : "btn-outline"
             }`}
             onClick={() => setFilterStatus("online")}
           >
-            <WifiIcon size={14} />
+            <WifiIcon size={16} className="sm:w-[14px] sm:h-[14px]" />
             Online
             <span
-              className={`badge badge-xs ml-0.5 ${
+              className={`badge badge-sm sm:badge-xs ml-0.5 ${
                 filterStatus === "online" ? "badge-primary-content" : "badge-neutral"
               }`}
             >
@@ -95,15 +80,15 @@ const FriendsPage = () => {
 
           <button
             type="button"
-            className={`btn btn-sm flex items-center gap-2 transition-all ${
+            className={`btn sm:btn-sm min-h-[44px] sm:min-h-0 flex items-center gap-2 transition-all ${
               filterStatus === "offline" ? "btn-primary" : "btn-outline"
             }`}
             onClick={() => setFilterStatus("offline")}
           >
-            <WifiOffIcon size={14} />
+            <WifiOffIcon size={16} className="sm:w-[14px] sm:h-[14px]" />
             Offline
             <span
-              className={`badge badge-xs ml-0.5 ${
+              className={`badge badge-sm sm:badge-xs ml-0.5 ${
                 filterStatus === "offline" ? "badge-primary-content" : "badge-neutral"
               }`}
             >

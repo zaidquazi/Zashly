@@ -41,6 +41,7 @@ export async function getMoments(req, res) {
         duration: m.durationMs,
         createdAt: m.createdAt,
         viewers: m.viewers?.map(String) || [],
+        metadata: m.metadata || {},
       }))
     );
   } catch (e) {
@@ -51,15 +52,19 @@ export async function getMoments(req, res) {
 
 export async function createMoment(req, res) {
   try {
-    let { mediaUrl, type, durationMs } = req.body;
-    if (!mediaUrl || !type) {
-      return res.status(400).json({ message: "mediaUrl and type are required" });
+    let { mediaUrl, type, durationMs, metadata } = req.body;
+    if (!type) {
+      return res.status(400).json({ message: "type is required" });
     }
-    if (!["image", "video"].includes(type)) {
+    const validTypes = ["image", "video", "text", "voice", "gif", "poll", "question"];
+    if (!validTypes.includes(type)) {
       return res.status(400).json({ message: "Invalid type" });
     }
+    if (!mediaUrl && !["text", "poll", "question"].includes(type)) {
+      return res.status(400).json({ message: "mediaUrl is required for this type" });
+    }
 
-    if (mediaUrl.startsWith("data:")) {
+    if (mediaUrl && mediaUrl.startsWith("data:")) {
       const validation = validateBase64Upload(mediaUrl, type);
       if (!validation.ok) {
         return res.status(400).json({ message: validation.error });
@@ -76,11 +81,12 @@ export async function createMoment(req, res) {
 
     const moment = await Moment.create({
       user: req.user.id,
-      mediaUrl,
+      mediaUrl: mediaUrl || "",
       type,
       durationMs: Math.min(Number(durationMs) || 5000, 50000),
       expiresAt: new Date(Date.now() + HOURS_24),
       viewers: [],
+      metadata: metadata || {},
     });
 
     const populated = await moment.populate("user", "fullName profilePic");
@@ -94,6 +100,7 @@ export async function createMoment(req, res) {
       duration: populated.durationMs,
       createdAt: populated.createdAt,
       viewers: [],
+      metadata: populated.metadata || {},
     });
   } catch (e) {
     logger.error("createMoment error", e);

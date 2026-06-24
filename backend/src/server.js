@@ -44,6 +44,7 @@ import adminRoutes from "./routes/admin.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import usernameRoutes from "./routes/username.route.js";
 import callRoutes from "./routes/call.route.js";
+import publicRoutes from "./routes/public.route.js";
 
 import { connectDB } from "./lib/db.js";
 import { initSocket } from "./lib/socket.js";
@@ -88,6 +89,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/usernames", usernameRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/public", publicRoutes);
 
 // Static uploads — only serve from isolated directory (no directory listing)
 app.use(

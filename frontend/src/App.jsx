@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useNavigate } from "react-router";
 
 import { Toaster } from "react-hot-toast";
 
@@ -10,6 +10,11 @@ import Layout from "./components/Layout.jsx";
 import { useThemeStore } from "./store/useThemeStore.js";
 import useNotifications from "./hooks/useNotifications.js";
 import useGlobalAnnouncements from "./hooks/useGlobalAnnouncements.jsx";
+import useViewportHeight from "./hooks/useViewportHeight.js";
+import useAndroidBackButton from "./hooks/useAndroidBackButton.js";
+import NetworkStatusBar from "./components/NetworkStatusBar.jsx";
+import { registerNavigate } from "./lib/navigation.js";
+import { isNative, isAndroid } from "./lib/platform.js";
 
 const CallOverlay = lazy(() =>
   import("./features/calls/index.jsx").then((m) => ({ default: m.CallOverlay }))
@@ -43,20 +48,83 @@ const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
 const App = () => {
   const { isLoading, authUser } = useAuthUser();
   const { theme } = useThemeStore();
+  const navigate = useNavigate();
 
-  const onboardedHome = authUser && ["admin", "moderator", "owner"].includes(authUser.role) 
-    ? "/admin" 
+  // Register global navigate so non-React contexts can navigate without window.location.href
+  useEffect(() => {
+    registerNavigate(navigate);
+  }, [navigate]);
+
+  const onboardedHome = authUser && ["admin", "moderator", "owner"].includes(authUser.role)
+    ? "/admin"
     : "/app";
 
+  // Apply DaisyUI theme
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // ── Android / Capacitor native setup ──────────────────────────────────────
+  useEffect(() => {
+    if (!isNative()) return;
+
+    const setupNative = async () => {
+      try {
+        const { StatusBar, Style } = await import("@capacitor/status-bar");
+        await StatusBar.setOverlaysWebView({ overlay: false });
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: "#0f172a" });
+
+        document.body.classList.add("capacitor-native");
+        if (isAndroid()) document.body.classList.add("capacitor-android");
+      } catch (err) {
+        console.warn("[App] StatusBar setup failed:", err.message);
+      }
+    };
+
+    setupNative();
+  }, []);
+
+  // ── Hide SplashScreen after app is ready ──────────────────────────────────
+  useEffect(() => {
+    if (!isNative() || isLoading) return;
+
+    const hideSplash = async () => {
+      try {
+        const { SplashScreen } = await import("@capacitor/splash-screen");
+        await SplashScreen.hide({ fadeOutDuration: 300 });
+      } catch (err) {
+        console.warn("[App] SplashScreen hide failed:", err.message);
+      }
+    };
+
+    const t = setTimeout(hideSplash, 200);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
+  // ── Push notifications (after auth) ───────────────────────────────────────
+  useEffect(() => {
+    if (!isNative() || !authUser?._id) return;
+
+    const setupPush = async () => {
+      try {
+        const { registerPushNotifications } = await import("./lib/pushNotifications.js");
+        await registerPushNotifications(authUser._id, null);
+      } catch (err) {
+        console.warn("[App] Push notification setup failed:", err.message);
+      }
+    };
+
+    setupPush();
+  }, [authUser?._id]);
 
   const isAuthenticated = Boolean(authUser);
   const isOnboarded = authUser?.isOnboarded;
 
   useNotifications();
   useGlobalAnnouncements();
+  useViewportHeight();
+  useAndroidBackButton();
 
   useEffect(() => {
     if (isAuthenticated && isOnboarded) {
@@ -79,8 +147,11 @@ const App = () => {
     );
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]" style={{ minHeight: "var(--app-height, 100dvh)" }}>
       <RouteSeo />
+
+      {/* Offline indicator */}
+      <NetworkStatusBar />
 
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -136,7 +207,7 @@ const App = () => {
             }
           />
 
-          {/* Authenticated app (noindex via RouteSeo) */}
+          {/* Authenticated app */}
           <Route
             path="/app"
             element={authApp(
@@ -172,7 +243,7 @@ const App = () => {
           <Route
             path="/chat/:id"
             element={authApp(
-              <Layout showSidebar={false}>
+              <Layout showSidebar={false} showNavbar={false}>
                 <ChatPage />
               </Layout>
             )}
@@ -180,7 +251,7 @@ const App = () => {
           <Route
             path="/group/:groupId"
             element={authApp(
-              <Layout showSidebar={false}>
+              <Layout showSidebar={false} showNavbar={false}>
                 <GroupChatPage />
               </Layout>
             )}
@@ -239,6 +310,7 @@ const App = () => {
       </Suspense>
 
       <Toaster />
+      <audio id="global-notification-sound" src="/notification.wav" preload="auto" />
       {isAuthenticated && isOnboarded && (
         <Suspense fallback={null}>
           <CallOverlay />

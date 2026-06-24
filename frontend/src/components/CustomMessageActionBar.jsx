@@ -141,20 +141,22 @@ const CustomMessageActionBar = ({ children, isOwn, isGroupAdmin, isGroupChat }) 
                     )}
                     {deleting === "everyone" ? "Deleting…" : "Delete for everyone"}
                   </button>
-                  <button
-                    className="cmab-menu-item cmab-menu-danger"
-                    onClick={() => handleCustomDelete("me")}
-                    disabled={deleting !== null}
-                  >
-                    {deleting === "me" ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={13} />
-                    )}
-                    {deleting === "me" ? "Deleting…" : "Delete for me"}
-                  </button>
                 </>
               )}
+
+              {/* Delete for me is available for everyone */}
+              <button
+                className="cmab-menu-item cmab-menu-danger"
+                onClick={() => handleCustomDelete("me")}
+                disabled={deleting !== null}
+              >
+                {deleting === "me" ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Trash2 size={13} />
+                )}
+                {deleting === "me" ? "Deleting…" : "Delete for me"}
+              </button>
 
               {/* Flag — others' messages */}
               {!isOwn && actions.includes("flag") && (
