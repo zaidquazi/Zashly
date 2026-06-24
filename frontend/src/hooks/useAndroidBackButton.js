@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { isNative } from '../lib/platform';
 
 /**
@@ -17,7 +17,6 @@ const ROOT_PATHS = ['/app', '/friends', '/groups', '/calls', '/notifications', '
 
 const useAndroidBackButton = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const exitConfirmRef = useRef(false);
   const exitTimerRef = useRef(null);
 
@@ -65,37 +64,38 @@ const useAndroidBackButton = () => {
             return;
           }
 
-          // ── 4. If we can go back in history, go back ──────────────────
-          if (canGoBack) {
-            navigate(-1);
+          // ── 4. Determine if we are on a Root Screen ─────────────────
+          const isRoot = ROOT_PATHS.some((p) => currentPath === p || currentPath === '/');
+
+          // ── 5. SPA History Navigation ──────────────────────────────
+          // Instead of trusting only Capacitor's WebView canGoBack, we also trust React Router / SPA state.
+          const hasSpaHistory = window.history.length > 1 && window.history.state?.idx > 0;
+
+          if (!isRoot) {
+            if (canGoBack || hasSpaHistory) {
+              navigate(-1);
+            } else {
+              // Fallback if deep linked
+              navigate('/app', { replace: true });
+            }
             return;
           }
 
-          // ── 5. Root screen — ask for exit confirmation ─────────────────
-          const isRoot = ROOT_PATHS.some((p) => currentPath === p || currentPath === '/');
-          if (isRoot) {
-            if (exitConfirmRef.current) {
-              // Second press — exit app
-              App.exitApp();
-              return;
-            }
-
-            exitConfirmRef.current = true;
-
-            // Show "Press back again to exit" using dynamic import of toast
-            import('react-hot-toast').then(({ default: toast }) => {
-              toast('Press back again to exit', { icon: '⬅️', duration: 2000 });
-            });
-
-            // Reset after 2 seconds
-            clearTimeout(exitTimerRef.current);
-            exitTimerRef.current = setTimeout(() => {
-              exitConfirmRef.current = false;
-            }, 2000);
-          } else {
-            // Not root, not in history — navigate to home
-            navigate('/app', { replace: true });
+          // ── 6. Root screen — ask for exit confirmation ─────────────────
+          if (exitConfirmRef.current) {
+            App.exitApp();
+            return;
           }
+
+          exitConfirmRef.current = true;
+          import('react-hot-toast').then(({ default: toast }) => {
+            toast('Press back again to exit', { icon: '⬅️', duration: 2000 });
+          });
+
+          clearTimeout(exitTimerRef.current);
+          exitTimerRef.current = setTimeout(() => {
+            exitConfirmRef.current = false;
+          }, 2000);
         });
 
         return () => {
@@ -111,7 +111,7 @@ const useAndroidBackButton = () => {
     return () => {
       cleanup.then((fn) => fn?.());
     };
-  }, [navigate, location.pathname]);
+  }, [navigate]); // Only depend on navigate, do NOT depend on location.pathname to avoid re-attaching listener
 };
 
 export default useAndroidBackButton;
