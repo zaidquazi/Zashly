@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router";
 
 import { Toaster } from "react-hot-toast";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import PageLoader from "./components/PageLoader.jsx";
 import RouteSeo from "./components/seo/RouteSeo.jsx";
@@ -316,6 +317,7 @@ const App = () => {
           <CallOverlay />
         </Suspense>
       )}
+      <SpeedInsights />
     </div>
   );
 };
