@@ -46,13 +46,6 @@ export default defineConfig({
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("@tanstack")) return "query";
           if (id.includes("@capacitor")) return "capacitor";
-          if (
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("/react/")
-          ) {
-            return "react-vendor";
-          }
           return "vendor";
         },
       },
