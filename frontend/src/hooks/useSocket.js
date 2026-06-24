@@ -148,6 +148,7 @@ const useSocket = () => {
           _rosterReady = false;
 
           const newSocket = io(SOCKET_URL, {
+            auth: { token: localStorage.getItem("zashly_access_token") },
             withCredentials: true,
             reconnection: true,
             reconnectionDelay: 1000,
