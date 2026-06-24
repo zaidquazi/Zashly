@@ -7,6 +7,7 @@ import { validateEnv } from "../../config/security/env.config.js";
 const env = validateEnv();
 
 export function notFoundHandler(req, res) {
+  logger.warn("Not found handler triggered", { path: req.originalUrl, method: req.method, body: req.body });
   res.status(404).json({ message: "Resource not found" });
 }
 

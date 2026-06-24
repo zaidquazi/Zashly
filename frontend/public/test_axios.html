@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <script>
+    const instance = axios.create({ baseURL: '/api' });
+    console.log('Browser Result 1:', instance.getUri({ url: '/auth/login' }));
+
+    const instance2 = axios.create({ baseURL: 'http://localhost:5002/api' });
+    console.log('Browser Result 2:', instance2.getUri({ url: '/auth/login' }));
+  </script>
+</body>
+</html>

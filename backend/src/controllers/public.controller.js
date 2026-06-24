@@ -33,10 +33,10 @@ export const getLandingStats = asyncHandler(async (req, res) => {
 
     // Format the result
     cachedStats = {
-      activeUsers: activeUsers || 14205, // fallback if DB is completely empty
-      messagesSent: messagesSent || 8943210,
-      callsCompleted: callsCompleted || 340500,
-      communities: communities || 1250,
+      activeUsers: activeUsers || 0,
+      messagesSent: messagesSent || 0,
+      callsCompleted: callsCompleted || 0,
+      communities: communities || 0,
     };
     
     lastFetchTime = now;
@@ -52,10 +52,10 @@ export const getLandingStats = asyncHandler(async (req, res) => {
     res.status(200).json({
       success: true,
       data: cachedStats || {
-        activeUsers: 14205,
-        messagesSent: 8943210,
-        callsCompleted: 340500,
-        communities: 1250,
+        activeUsers: 0,
+        messagesSent: 0,
+        callsCompleted: 0,
+        communities: 0,
       },
       cached: false,
       error: "Using fallback data due to DB error"

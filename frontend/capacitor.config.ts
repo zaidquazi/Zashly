@@ -46,11 +46,12 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: KeyboardResize.Body,
-      resizeOnFullScreen: true,
+      resize: KeyboardResize.None,
+      resizeOnFullScreen: false,
       style: KeyboardStyle.Dark,
-      // On Android, keyboard causes window resize by default
-      // Setting this allows us to control layout ourselves
+      // KeyboardResize.None prevents the Android system from resizing the WebView body.
+      // The useViewportHeight JS hook manages --app-height / --keyboard-height
+      // via Capacitor Keyboard events, avoiding the double-shrink blank space bug.
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],

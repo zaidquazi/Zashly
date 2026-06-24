@@ -2,15 +2,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import useAuthUser from "./useAuthUser";
 import { refreshSession } from "../lib/api";
+import { getSocketUrl } from "../lib/platform";
 
-const currentHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
-let envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
-
-if (envApiUrl.includes("localhost") && currentHost !== "localhost") {
-  envApiUrl = envApiUrl.replace("localhost", currentHost);
-}
-
-const SOCKET_URL = envApiUrl || `/`;
+const SOCKET_URL = getSocketUrl();
 
 let socketInstance = null;
 let connectionPromise = null;

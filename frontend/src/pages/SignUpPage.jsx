@@ -109,8 +109,18 @@ const SignUpPage = () => {
         setSuggestions(generateSuggestions(val));
       }
     } catch (err) {
-      setUsernameStatus("error");
-      setUsernameMessage(err.response?.data?.message || "Error checking username");
+      // Distinguish network/API errors from actual "taken" responses
+      const serverMsg = err.response?.data?.message;
+      if (serverMsg) {
+        // Server responded with a structured error (e.g., invalid format)
+        setUsernameStatus("error");
+        setUsernameMessage(serverMsg);
+      } else {
+        // Network failure — don't show red X (looks like "taken")
+        setUsernameStatus("warning");
+        setUsernameMessage("Unable to check — tap to retry");
+      }
+      setSuggestions([]);
     }
   }, []);
 
@@ -209,6 +219,7 @@ const SignUpPage = () => {
                 <div className={`relative flex items-center bg-base-200/50 border transition-all duration-300 rounded-xl overflow-hidden shadow-inner
                   ${isUsernameFocused ? 'border-primary/50 shadow-[0_0_0_4px_rgba(var(--p),0.1)] bg-base-100' : 'border-white/10'}
                   ${usernameStatus === 'error' || usernameStatus === 'unavailable' ? '!border-error/50 bg-error/5' : ''}
+                  ${usernameStatus === 'warning' ? '!border-warning/50 bg-warning/5' : ''}
                   ${usernameStatus === 'available' ? '!border-success/50 bg-success/5' : ''}
                 `}>
                   <div className="pl-3 pr-2 opacity-40">
@@ -247,6 +258,19 @@ const SignUpPage = () => {
                           <XCircle className="size-4 text-error" />
                         </motion.div>
                       )}
+                      {usernameStatus === 'warning' && (
+                        <motion.div 
+                          key="warning" 
+                          initial={{ opacity: 0, scale: 0.8 }} 
+                          animate={{ opacity: 1, scale: 1 }} 
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          onClick={() => validateUsername(signupData.username)}
+                          className="cursor-pointer"
+                          title="Tap to retry"
+                        >
+                          <AlertCircle className="size-4 text-warning" />
+                        </motion.div>
+                      )}
                     </AnimatePresence>
                   </div>
                 </div>
@@ -263,6 +287,7 @@ const SignUpPage = () => {
                       <p className={`text-[11px] mt-1 transition-colors font-medium ${
                         usernameStatus === 'available' ? 'text-success' : 
                         usernameStatus === 'loading' ? 'opacity-50' : 
+                        usernameStatus === 'warning' ? 'text-warning' :
                         'text-error'
                       }`}>
                         {usernameMessage}

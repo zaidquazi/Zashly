@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Code2, Heart, Sparkles, Terminal } from "lucide-react";
 
 export default function FounderCard() {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <section className="py-24 bg-base-200/50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,12 +20,19 @@ export default function FounderCard() {
             {/* Avatar / Photo */}
             <div className="shrink-0 relative group">
               <div className="absolute inset-0 bg-gradient-to-tr from-primary to-secondary rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
-              <img 
-                // TODO: Replace with real photo of Zaid Husain
-                src="/public/pro.jpeg" 
-                alt="Zaid Husain" 
-                className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full object-cover border-4 border-base-100 shadow-xl"
-              />
+              {imgError ? (
+                <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full border-4 border-base-100 shadow-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                  <span className="text-4xl sm:text-5xl font-bold text-white select-none">ZH</span>
+                </div>
+              ) : (
+                <img 
+                  src="/pro.jpeg" 
+                  alt="Zaid Husain" 
+                  loading="lazy"
+                  onError={() => setImgError(true)}
+                  className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full object-cover border-4 border-base-100 shadow-xl"
+                />
+              )}
               <div className="absolute -bottom-2 -right-2 bg-base-100 p-2 rounded-full shadow-lg border border-base-200">
                 <Code2 className="w-6 h-6 text-primary" />
               </div>

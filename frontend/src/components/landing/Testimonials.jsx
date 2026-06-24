@@ -1,32 +1,43 @@
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
+import { Shield, Zap, Lock, Radio, Code2, Globe, Heart, RefreshCw } from "lucide-react";
 
-// Placeholder content marked clearly as per requirements
-const testimonials = [
+const trustPoints = [
   {
-    id: 1,
-    name: "Sarah Jenkins",
-    role: "Community Manager",
-    avatar: "https://i.pravatar.cc/150?u=sarah",
-    quote: "Zashly replaced Discord for our entire team. The UI is just so much cleaner, and the voice call quality is noticeably better.",
-    rating: 5,
+    icon: Lock,
+    title: "End-to-End Secure",
+    desc: "Your conversations are encrypted and your data stays private. No ads, no data selling.",
+    accent: "from-blue-500 to-cyan-400",
   },
   {
-    id: 2,
-    name: "Marcus Chen",
-    role: "Student",
-    avatar: "https://i.pravatar.cc/150?u=marcus",
-    quote: "I love the Moments feature. It's like having Instagram stories but only for my actual close friends. Super fast and responsive.",
-    rating: 5,
+    icon: Zap,
+    title: "Lightning Fast",
+    desc: "Built with React 19 and real-time WebSocket infrastructure for instant message delivery.",
+    accent: "from-amber-500 to-orange-400",
   },
   {
-    id: 3,
-    name: "Elena Rodriguez",
-    role: "Freelance Designer",
-    avatar: "https://i.pravatar.cc/150?u=elena",
-    quote: "The attention to detail in the UI is fantastic. Dark mode looks incredible, and I never miss notifications anymore.",
-    rating: 5,
-  }
+    icon: Radio,
+    title: "Crystal-Clear Calls",
+    desc: "Voice and video calls powered by WebRTC with adaptive quality and low-latency connections.",
+    accent: "from-violet-500 to-purple-400",
+  },
+  {
+    icon: Code2,
+    title: "Modern Tech Stack",
+    desc: "React 19, Node.js, MongoDB, Socket.IO, and LiveKit — built with production-grade tools.",
+    accent: "from-emerald-500 to-teal-400",
+  },
+  {
+    icon: RefreshCw,
+    title: "Actively Developed",
+    desc: "New features and improvements ship regularly. Built by a developer who uses it daily.",
+    accent: "from-pink-500 to-rose-400",
+  },
+  {
+    icon: Globe,
+    title: "Works Everywhere",
+    desc: "Use Zashly on any device — web, Android, and mobile browsers. Your chats sync seamlessly.",
+    accent: "from-sky-500 to-indigo-400",
+  },
 ];
 
 export default function Testimonials() {
@@ -41,7 +52,7 @@ export default function Testimonials() {
             viewport={{ once: true }}
             className="text-3xl sm:text-4xl font-bold mb-4"
           >
-            Loved by our users.
+            Why Choose Zashly?
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -50,39 +61,47 @@ export default function Testimonials() {
             transition={{ delay: 0.1 }}
             className="text-lg text-base-content/70"
           >
-            {/* TODO: Replace with real user testimonials when available */}
-            Don't just take our word for it. Here's what people are saying about Zashly.
+            A communication platform built with care, security, and performance at its core.
           </motion.p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((item, idx) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 + (idx * 0.1) }}
-              className="bg-base-200 p-8 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative"
-            >
-              <div className="flex gap-1 mb-6">
-                {[...Array(item.rating)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-warning text-warning" />
-                ))}
-              </div>
-              <blockquote className="text-base-content/80 text-lg leading-relaxed mb-8">
-                "{item.quote}"
-              </blockquote>
-              <div className="flex items-center gap-4 mt-auto">
-                <img src={item.avatar} alt={item.name} className="w-12 h-12 rounded-full object-cover bg-base-300" />
-                <div>
-                  <h4 className="font-bold text-base-content">{item.name}</h4>
-                  <p className="text-sm text-base-content/60">{item.role}</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {trustPoints.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 + (idx * 0.07) }}
+                className="group bg-base-200/50 hover:bg-base-200 p-7 rounded-2xl border border-base-300/50 hover:border-primary/20 transition-all duration-300 hover:shadow-lg"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.accent} flex items-center justify-center mb-5 shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-              </div>
-            </motion.div>
-          ))}
+                <h3 className="text-lg font-bold mb-2 text-base-content">{item.title}</h3>
+                <p className="text-base-content/60 text-sm leading-relaxed">{item.desc}</p>
+              </motion.div>
+            );
+          })}
         </div>
+
+        {/* Honest community note */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5 }}
+          className="mt-12 text-center"
+        >
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-base-200/80 rounded-full border border-base-300/50">
+            <Heart className="w-4 h-4 text-error" />
+            <span className="text-sm text-base-content/60">
+              Zashly is growing — join early and help shape the future of communication.
+            </span>
+          </div>
+        </motion.div>
 
       </div>
     </section>

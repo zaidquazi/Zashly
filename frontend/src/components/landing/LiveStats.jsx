@@ -1,12 +1,12 @@
 import { motion, useInView } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 
-// Configurable fallback stats for easy API replacement
+// Fallback stats — zeroes until real data loads from the API
 const fallbackStats = {
-  activeUsers: 14205,
-  messagesSent: 8943210,
-  callsCompleted: 340500,
-  communities: 1250,
+  activeUsers: 0,
+  messagesSent: 0,
+  callsCompleted: 0,
+  communities: 0,
 };
 
 function CountUp({ end, duration = 2, suffix = "" }) {
