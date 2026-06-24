@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import ProfileAvatar from "../components/ProfileAvatar";
+import { motion, AnimatePresence } from "framer-motion";
 
 const EditProfilePage = () => {
   const navigate = useNavigate();
   const { authUser } = useAuthUser();
   const queryClient = useQueryClient();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [formState, setFormState] = useState({
     fullName: authUser?.fullName || "",
@@ -90,13 +92,13 @@ const EditProfilePage = () => {
 
   // Remove profile picture with confirmation
   const handleRemovePicture = () => {
-    const confirmed = window.confirm(
-      "Are you sure you want to remove your profile picture?"
-    );
-    if (confirmed) {
-      setFormState({ ...formState, profilePic: "" });
-      toast("Profile picture removed", { icon: "🗑️" });
-    }
+    setShowDeleteModal(true);
+  };
+
+  const confirmRemovePicture = () => {
+    setFormState({ ...formState, profilePic: "" });
+    setShowDeleteModal(false);
+    toast("Profile picture removed", { icon: "🗑️" });
   };
 
   return (
@@ -256,6 +258,39 @@ const EditProfilePage = () => {
           </div>
         </div>
       </div>
+
+      {/* Custom Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-base-100 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/10"
+            >
+              <h3 className="text-xl font-bold mb-2">Remove Picture</h3>
+              <p className="text-sm opacity-70 mb-6">Are you sure you want to remove your profile picture?</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="btn btn-ghost rounded-xl"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemovePicture}
+                  className="btn btn-error rounded-xl"
+                  type="button"
+                >
+                  Remove
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

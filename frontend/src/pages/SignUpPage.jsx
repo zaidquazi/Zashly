@@ -12,7 +12,8 @@ import {
   Shield, 
   Zap, 
   User,
-  Sparkles
+  Sparkles,
+  ArrowRight
 } from "lucide-react";
 import Logo from "../components/Logo";
 

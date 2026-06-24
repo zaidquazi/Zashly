@@ -7,7 +7,7 @@ async function resetPassword() {
   try {
     await connectDB();
     const users = await User.find({ email: { $regex: /zaid/i } });
-    
+
     if (users.length === 0) {
       console.log("❌ No user found containing 'zaid' in the database at all!");
       console.log("Here are the actual emails stored in the database:");
@@ -15,7 +15,7 @@ async function resetPassword() {
       allUsers.forEach(u => console.log(`- ${u.email}`));
       return;
     }
-    
+
     for (const user of users) {
       user.email = "zaidquazi412@gmail.com";
       user.password = "zaid890";

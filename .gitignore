@@ -40,3 +40,7 @@ backend/.env
 frontend/.env
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+.env
+.env.local
+.env.production

@@ -71,6 +71,7 @@ const OnboardingPage = () => {
 
   const [step, setStep] = useState(0);
   const totalSteps = 5;
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [formState, setFormState] = useState({
     fullName: authUser?.fullName || "",
@@ -127,9 +128,12 @@ const OnboardingPage = () => {
   const handleGalleryUpload = (e) => processImage(e.target.files[0]);
 
   const handleRemovePicture = () => {
-    if (window.confirm("Are you sure you want to remove your profile picture?")) {
-      setFormState({ ...formState, profilePic: "" });
-    }
+    setShowDeleteModal(true);
+  };
+
+  const confirmRemovePicture = () => {
+    setFormState({ ...formState, profilePic: "" });
+    setShowDeleteModal(false);
   };
 
   const hasImage = !!formState.profilePic;
@@ -395,6 +399,39 @@ const OnboardingPage = () => {
         )}
 
       </div>
+
+      {/* Custom Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-base-100 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/10"
+            >
+              <h3 className="text-xl font-bold mb-2">Remove Picture</h3>
+              <p className="text-sm opacity-70 mb-6">Are you sure you want to remove your profile picture?</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="btn btn-ghost rounded-xl"
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemovePicture}
+                  className="btn btn-error rounded-xl"
+                  type="button"
+                >
+                  Remove
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
