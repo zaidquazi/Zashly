@@ -111,7 +111,19 @@ export async function login(req, res) {
     const { username, password, rememberMe } = req.body;
     const ip = getClientIp(req);
 
-    let userQuery = { username: username.toLowerCase() };
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username/Email and password are required" });
+    }
+
+    const identifier = username.trim().toLowerCase();
+    const userQuery = {
+      $or: [
+        { email: identifier },
+        { usernameLowerCase: identifier },
+        // Fallback just in case old users don't have usernameLowerCase
+        { username: identifier }
+      ]
+    };
     
     const user = await User.findOne(userQuery).select("+password");
     
